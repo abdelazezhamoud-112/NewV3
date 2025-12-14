@@ -3,9 +3,9 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IDoctor extends Document {
   name: string;
   specialization: string;
-  contact: string;
-  email: string;
-  clinic: string;
+  contact?: string;
+  email?: string;
+  clinicId?: mongoose.Types.ObjectId;
 }
 
 const DoctorSchema: Schema = new Schema({
@@ -13,7 +13,7 @@ const DoctorSchema: Schema = new Schema({
   specialization: { type: String, required: true },
   contact: { type: String },
   email: { type: String },
-  clinic: { type: String },
+  clinicId: { type: Schema.Types.ObjectId, ref: 'Clinic' },
 });
 
 export default mongoose.model<IDoctor>('Doctor', DoctorSchema);

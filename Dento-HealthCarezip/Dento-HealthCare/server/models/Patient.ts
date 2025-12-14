@@ -1,23 +1,23 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IPatient extends Document {
-  name: string;
-  dob: Date;
-  gender: string;
-  contact: string;
-  email: string;
-  address: string;
-  medicalHistory: string[];
+  fullName: string;
+  age: number;
+  phone: string;
+  clinicId: mongoose.Types.ObjectId;
+  assignedToUserId?: mongoose.Types.ObjectId;
+  status: string;
+  createdAt: Date;
 }
 
 const PatientSchema: Schema = new Schema({
-  name: { type: String, required: true },
-  dob: { type: Date, required: true },
-  gender: { type: String, required: true },
-  contact: { type: String },
-  email: { type: String },
-  address: { type: String },
-  medicalHistory: [{ type: String }],
+  fullName: { type: String, required: true },
+  age: { type: Number, required: true },
+  phone: { type: String, required: true },
+  clinicId: { type: Schema.Types.ObjectId, ref: 'Clinic', required: true },
+  assignedToUserId: { type: Schema.Types.ObjectId, ref: 'User' },
+  status: { type: String, default: 'active' },
+  createdAt: { type: Date, default: Date.now },
 });
 
 export default mongoose.model<IPatient>('Patient', PatientSchema);

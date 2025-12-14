@@ -1,23 +1,21 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IReport extends Document {
+export interface ITreatmentPlan extends Document {
   patientId: mongoose.Types.ObjectId;
   clinicId: mongoose.Types.ObjectId;
   title: string;
-  content: string;
-  reportType: string;
-  createdBy: mongoose.Types.ObjectId;
+  description: string;
+  status: string;
   createdAt: Date;
 }
 
-const ReportSchema: Schema = new Schema({
+const TreatmentPlanSchema: Schema = new Schema({
   patientId: { type: Schema.Types.ObjectId, ref: 'Patient', required: true },
   clinicId: { type: Schema.Types.ObjectId, ref: 'Clinic', required: true },
   title: { type: String, required: true },
-  content: { type: String, required: true },
-  reportType: { type: String, required: true },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  description: { type: String, required: true },
+  status: { type: String, default: 'pending' },
   createdAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.model<IReport>('Report', ReportSchema);
+export default mongoose.model<ITreatmentPlan>('TreatmentPlan', TreatmentPlanSchema);
