@@ -1,27 +1,16 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { db } from "./db";
-import { 
-  users, 
-  patients, 
-  doctors, 
-  appointments, 
-  clinics, 
-  treatments, 
-  reports,
-  treatmentPlans,
-  insertUserSchema,
-  insertPatientSchema,
-  insertDoctorSchema,
-  insertAppointmentSchema,
-  insertClinicSchema,
-  insertTreatmentSchema,
-  insertReportSchema,
-  insertTreatmentPlanSchema
-} from "../shared/schema";
-import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import OpenAI from "openai";
+
+import User from "./models/User";
+import Clinic from "./models/Clinic";
+import Doctor from "./models/Doctor";
+import Patient from "./models/Patient";
+import Appointment from "./models/Appointment";
+import Treatment from "./models/Treatment";
+import TreatmentPlan from "./models/TreatmentPlan";
+import Report from "./models/Report";
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -31,7 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   app.get('/api/users', async (_req, res) => {
     try {
-      const allUsers = await db.query.users.findMany();
+      const allUsers = await User.find();
       res.json(allUsers);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -40,9 +29,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/users/:id', async (req, res) => {
     try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, req.params.id),
-      });
+      const user = await User.findById(req.params.id);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -54,8 +41,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/users', async (req, res) => {
     try {
-      const validatedData = insertUserSchema.parse(req.body);
-      const [user] = await db.insert(users).values(validatedData).returning();
+      const user = new User(req.body);
+      await user.save();
       res.status(201).json(user);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -64,11 +51,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/users/:id', async (req, res) => {
     try {
-      const validatedData = insertUserSchema.partial().parse(req.body);
-      const [user] = await db.update(users)
-        .set(validatedData)
-        .where(eq(users.id, req.params.id))
-        .returning();
+      const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -80,9 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/users/:id', async (req, res) => {
     try {
-      const [user] = await db.delete(users)
-        .where(eq(users.id, req.params.id))
-        .returning();
+      const user = await User.findByIdAndDelete(req.params.id);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -97,29 +78,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password, fullName, email, phone, userType } = req.body;
       
-      // Check if username already exists
-      const existingUsers = await db.select().from(users).where(eq(users.username, username)).limit(1);
+      const existingUser = await User.findOne({ username });
       
-      if (existingUsers.length > 0) {
+      if (existingUser) {
         return res.status(400).json({ message: 'اسم المستخدم موجود بالفعل' });
       }
       
-      // Hash password
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
       
-      // Create user
-      const [newUser] = await db.insert(users).values({
+      const newUser = new User({
         username,
         password: hashedPassword,
         fullName,
         email: email || null,
         phone: phone || null,
         userType: userType || 'patient',
-      }).returning();
+      });
       
-      // Return user without password
-      const { password: _, ...userWithoutPassword } = newUser;
+      await newUser.save();
+      
+      const userObj = newUser.toObject();
+      const { password: _, ...userWithoutPassword } = userObj;
       res.status(201).json(userWithoutPassword);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -130,24 +110,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
       
-      // Find user by username using select instead of query
-      const foundUsers = await db.select().from(users).where(eq(users.username, username)).limit(1);
+      const user = await User.findOne({ username });
       
-      if (foundUsers.length === 0) {
+      if (!user) {
         return res.status(401).json({ message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
       }
       
-      const user = foundUsers[0];
-      
-      // Verify password
       const isValidPassword = await bcrypt.compare(password, user.password);
       
       if (!isValidPassword) {
         return res.status(401).json({ message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
       }
       
-      // Return user without password
-      const { password: _, ...userWithoutPassword } = user;
+      const userObj = user.toObject();
+      const { password: _, ...userWithoutPassword } = userObj;
       res.json(userWithoutPassword);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -157,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Clinic routes
   app.get('/api/clinics', async (_req, res) => {
     try {
-      const allClinics = await db.query.clinics.findMany();
+      const allClinics = await Clinic.find();
       res.json(allClinics);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -166,9 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/clinics/:id', async (req, res) => {
     try {
-      const clinic = await db.query.clinics.findFirst({
-        where: eq(clinics.id, req.params.id),
-      });
+      const clinic = await Clinic.findById(req.params.id);
       if (!clinic) {
         return res.status(404).json({ message: 'Clinic not found' });
       }
@@ -180,8 +154,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/clinics', async (req, res) => {
     try {
-      const validatedData = insertClinicSchema.parse(req.body);
-      const [clinic] = await db.insert(clinics).values(validatedData).returning();
+      const clinic = new Clinic(req.body);
+      await clinic.save();
       res.status(201).json(clinic);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -190,11 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/clinics/:id', async (req, res) => {
     try {
-      const validatedData = insertClinicSchema.partial().parse(req.body);
-      const [clinic] = await db.update(clinics)
-        .set(validatedData)
-        .where(eq(clinics.id, req.params.id))
-        .returning();
+      const clinic = await Clinic.findByIdAndUpdate(req.params.id, req.body, { new: true });
       if (!clinic) {
         return res.status(404).json({ message: 'Clinic not found' });
       }
@@ -206,9 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/clinics/:id', async (req, res) => {
     try {
-      const [clinic] = await db.delete(clinics)
-        .where(eq(clinics.id, req.params.id))
-        .returning();
+      const clinic = await Clinic.findByIdAndDelete(req.params.id);
       if (!clinic) {
         return res.status(404).json({ message: 'Clinic not found' });
       }
@@ -221,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Patient routes
   app.get('/api/patients', async (_req, res) => {
     try {
-      const allPatients = await db.query.patients.findMany();
+      const allPatients = await Patient.find().populate('clinicId').populate('assignedToUserId');
       res.json(allPatients);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -230,9 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/patients/:id', async (req, res) => {
     try {
-      const patient = await db.query.patients.findFirst({
-        where: eq(patients.id, req.params.id),
-      });
+      const patient = await Patient.findById(req.params.id).populate('clinicId').populate('assignedToUserId');
       if (!patient) {
         return res.status(404).json({ message: 'Patient not found' });
       }
@@ -244,8 +210,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/patients', async (req, res) => {
     try {
-      const validatedData = insertPatientSchema.parse(req.body);
-      const [patient] = await db.insert(patients).values(validatedData).returning();
+      const patient = new Patient(req.body);
+      await patient.save();
       res.status(201).json(patient);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -254,11 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/patients/:id', async (req, res) => {
     try {
-      const validatedData = insertPatientSchema.partial().parse(req.body);
-      const [patient] = await db.update(patients)
-        .set(validatedData)
-        .where(eq(patients.id, req.params.id))
-        .returning();
+      const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, { new: true });
       if (!patient) {
         return res.status(404).json({ message: 'Patient not found' });
       }
@@ -270,9 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/patients/:id', async (req, res) => {
     try {
-      const [patient] = await db.delete(patients)
-        .where(eq(patients.id, req.params.id))
-        .returning();
+      const patient = await Patient.findByIdAndDelete(req.params.id);
       if (!patient) {
         return res.status(404).json({ message: 'Patient not found' });
       }
@@ -285,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Doctor routes
   app.get('/api/doctors', async (_req, res) => {
     try {
-      const allDoctors = await db.query.doctors.findMany();
+      const allDoctors = await Doctor.find().populate('clinicId');
       res.json(allDoctors);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -294,9 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/doctors/:id', async (req, res) => {
     try {
-      const doctor = await db.query.doctors.findFirst({
-        where: eq(doctors.id, req.params.id),
-      });
+      const doctor = await Doctor.findById(req.params.id).populate('clinicId');
       if (!doctor) {
         return res.status(404).json({ message: 'Doctor not found' });
       }
@@ -308,8 +266,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/doctors', async (req, res) => {
     try {
-      const validatedData = insertDoctorSchema.parse(req.body);
-      const [doctor] = await db.insert(doctors).values(validatedData).returning();
+      const doctor = new Doctor(req.body);
+      await doctor.save();
       res.status(201).json(doctor);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -318,11 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/doctors/:id', async (req, res) => {
     try {
-      const validatedData = insertDoctorSchema.partial().parse(req.body);
-      const [doctor] = await db.update(doctors)
-        .set(validatedData)
-        .where(eq(doctors.id, req.params.id))
-        .returning();
+      const doctor = await Doctor.findByIdAndUpdate(req.params.id, req.body, { new: true });
       if (!doctor) {
         return res.status(404).json({ message: 'Doctor not found' });
       }
@@ -334,9 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/doctors/:id', async (req, res) => {
     try {
-      const [doctor] = await db.delete(doctors)
-        .where(eq(doctors.id, req.params.id))
-        .returning();
+      const doctor = await Doctor.findByIdAndDelete(req.params.id);
       if (!doctor) {
         return res.status(404).json({ message: 'Doctor not found' });
       }
@@ -349,12 +301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Appointment routes with populated patient and doctor data
   app.get('/api/appointments', async (_req, res) => {
     try {
-      const allAppointments = await db.query.appointments.findMany({
-        with: {
-          patient: true,
-          doctor: true,
-        },
-      });
+      const allAppointments = await Appointment.find().populate('patientId').populate('doctorId');
       res.json(allAppointments);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -363,13 +310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/appointments/:id', async (req, res) => {
     try {
-      const appointment = await db.query.appointments.findFirst({
-        where: eq(appointments.id, req.params.id),
-        with: {
-          patient: true,
-          doctor: true,
-        },
-      });
+      const appointment = await Appointment.findById(req.params.id).populate('patientId').populate('doctorId');
       if (!appointment) {
         return res.status(404).json({ message: 'Appointment not found' });
       }
@@ -381,8 +322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/appointments', async (req, res) => {
     try {
-      const validatedData = insertAppointmentSchema.parse(req.body);
-      const [appointment] = await db.insert(appointments).values(validatedData).returning();
+      const appointment = new Appointment(req.body);
+      await appointment.save();
       res.status(201).json(appointment);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -391,18 +332,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/appointments/:id', async (req, res) => {
     try {
-      const validatedData = insertAppointmentSchema.partial().parse(req.body);
-      await db.update(appointments)
-        .set(validatedData)
-        .where(eq(appointments.id, req.params.id));
-      
-      const appointment = await db.query.appointments.findFirst({
-        where: eq(appointments.id, req.params.id),
-        with: {
-          patient: true,
-          doctor: true,
-        },
-      });
+      const appointment = await Appointment.findByIdAndUpdate(req.params.id, req.body, { new: true })
+        .populate('patientId')
+        .populate('doctorId');
       if (!appointment) {
         return res.status(404).json({ message: 'Appointment not found' });
       }
@@ -414,9 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/appointments/:id', async (req, res) => {
     try {
-      const [appointment] = await db.delete(appointments)
-        .where(eq(appointments.id, req.params.id))
-        .returning();
+      const appointment = await Appointment.findByIdAndDelete(req.params.id);
       if (!appointment) {
         return res.status(404).json({ message: 'Appointment not found' });
       }
@@ -429,12 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Treatment routes with populated patient and doctor data
   app.get('/api/treatments', async (_req, res) => {
     try {
-      const allTreatments = await db.query.treatments.findMany({
-        with: {
-          patient: true,
-          doctor: true,
-        },
-      });
+      const allTreatments = await Treatment.find().populate('patientId').populate('doctorId');
       res.json(allTreatments);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -443,13 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/treatments/:id', async (req, res) => {
     try {
-      const treatment = await db.query.treatments.findFirst({
-        where: eq(treatments.id, req.params.id),
-        with: {
-          patient: true,
-          doctor: true,
-        },
-      });
+      const treatment = await Treatment.findById(req.params.id).populate('patientId').populate('doctorId');
       if (!treatment) {
         return res.status(404).json({ message: 'Treatment not found' });
       }
@@ -461,8 +380,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/treatments', async (req, res) => {
     try {
-      const validatedData = insertTreatmentSchema.parse(req.body);
-      const [treatment] = await db.insert(treatments).values(validatedData).returning();
+      const treatment = new Treatment(req.body);
+      await treatment.save();
       res.status(201).json(treatment);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -471,18 +390,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/treatments/:id', async (req, res) => {
     try {
-      const validatedData = insertTreatmentSchema.partial().parse(req.body);
-      await db.update(treatments)
-        .set(validatedData)
-        .where(eq(treatments.id, req.params.id));
-      
-      const treatment = await db.query.treatments.findFirst({
-        where: eq(treatments.id, req.params.id),
-        with: {
-          patient: true,
-          doctor: true,
-        },
-      });
+      const treatment = await Treatment.findByIdAndUpdate(req.params.id, req.body, { new: true })
+        .populate('patientId')
+        .populate('doctorId');
       if (!treatment) {
         return res.status(404).json({ message: 'Treatment not found' });
       }
@@ -494,9 +404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/treatments/:id', async (req, res) => {
     try {
-      const [treatment] = await db.delete(treatments)
-        .where(eq(treatments.id, req.params.id))
-        .returning();
+      const treatment = await Treatment.findByIdAndDelete(req.params.id);
       if (!treatment) {
         return res.status(404).json({ message: 'Treatment not found' });
       }
@@ -509,12 +417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Treatment Plan routes with populated patient and clinic data
   app.get('/api/treatment-plans', async (_req, res) => {
     try {
-      const allTreatmentPlans = await db.query.treatmentPlans.findMany({
-        with: {
-          patient: true,
-          clinic: true,
-        },
-      });
+      const allTreatmentPlans = await TreatmentPlan.find().populate('patientId').populate('clinicId');
       res.json(allTreatmentPlans);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -523,13 +426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/treatment-plans/:id', async (req, res) => {
     try {
-      const treatmentPlan = await db.query.treatmentPlans.findFirst({
-        where: eq(treatmentPlans.id, req.params.id),
-        with: {
-          patient: true,
-          clinic: true,
-        },
-      });
+      const treatmentPlan = await TreatmentPlan.findById(req.params.id).populate('patientId').populate('clinicId');
       if (!treatmentPlan) {
         return res.status(404).json({ message: 'Treatment plan not found' });
       }
@@ -541,8 +438,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/treatment-plans', async (req, res) => {
     try {
-      const validatedData = insertTreatmentPlanSchema.parse(req.body);
-      const [treatmentPlan] = await db.insert(treatmentPlans).values(validatedData).returning();
+      const treatmentPlan = new TreatmentPlan(req.body);
+      await treatmentPlan.save();
       res.status(201).json(treatmentPlan);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -551,18 +448,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/treatment-plans/:id', async (req, res) => {
     try {
-      const validatedData = insertTreatmentPlanSchema.partial().parse(req.body);
-      await db.update(treatmentPlans)
-        .set(validatedData)
-        .where(eq(treatmentPlans.id, req.params.id));
-      
-      const treatmentPlan = await db.query.treatmentPlans.findFirst({
-        where: eq(treatmentPlans.id, req.params.id),
-        with: {
-          patient: true,
-          clinic: true,
-        },
-      });
+      const treatmentPlan = await TreatmentPlan.findByIdAndUpdate(req.params.id, req.body, { new: true })
+        .populate('patientId')
+        .populate('clinicId');
       if (!treatmentPlan) {
         return res.status(404).json({ message: 'Treatment plan not found' });
       }
@@ -574,9 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/treatment-plans/:id', async (req, res) => {
     try {
-      const [treatmentPlan] = await db.delete(treatmentPlans)
-        .where(eq(treatmentPlans.id, req.params.id))
-        .returning();
+      const treatmentPlan = await TreatmentPlan.findByIdAndDelete(req.params.id);
       if (!treatmentPlan) {
         return res.status(404).json({ message: 'Treatment plan not found' });
       }
@@ -589,13 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Report routes with populated patient, clinic and createdBy user data
   app.get('/api/reports', async (_req, res) => {
     try {
-      const allReports = await db.query.reports.findMany({
-        with: {
-          patient: true,
-          clinic: true,
-          createdBy: true,
-        },
-      });
+      const allReports = await Report.find().populate('patientId').populate('clinicId').populate('createdBy');
       res.json(allReports);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -604,14 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/reports/:id', async (req, res) => {
     try {
-      const report = await db.query.reports.findFirst({
-        where: eq(reports.id, req.params.id),
-        with: {
-          patient: true,
-          clinic: true,
-          createdBy: true,
-        },
-      });
+      const report = await Report.findById(req.params.id).populate('patientId').populate('clinicId').populate('createdBy');
       if (!report) {
         return res.status(404).json({ message: 'Report not found' });
       }
@@ -623,8 +496,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/reports', async (req, res) => {
     try {
-      const validatedData = insertReportSchema.parse(req.body);
-      const [report] = await db.insert(reports).values(validatedData).returning();
+      const report = new Report(req.body);
+      await report.save();
       res.status(201).json(report);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -633,19 +506,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/reports/:id', async (req, res) => {
     try {
-      const validatedData = insertReportSchema.partial().parse(req.body);
-      await db.update(reports)
-        .set(validatedData)
-        .where(eq(reports.id, req.params.id));
-      
-      const report = await db.query.reports.findFirst({
-        where: eq(reports.id, req.params.id),
-        with: {
-          patient: true,
-          clinic: true,
-          createdBy: true,
-        },
-      });
+      const report = await Report.findByIdAndUpdate(req.params.id, req.body, { new: true })
+        .populate('patientId')
+        .populate('clinicId')
+        .populate('createdBy');
       if (!report) {
         return res.status(404).json({ message: 'Report not found' });
       }
@@ -657,9 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/reports/:id', async (req, res) => {
     try {
-      const [report] = await db.delete(reports)
-        .where(eq(reports.id, req.params.id))
-        .returning();
+      const report = await Report.findByIdAndDelete(req.params.id);
       if (!report) {
         return res.status(404).json({ message: 'Report not found' });
       }
@@ -721,8 +583,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         max_tokens: 2048
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
-      res.json(result);
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error('No response from AI');
+      }
+
+      const diagnosis = JSON.parse(content);
+      res.json(diagnosis);
     } catch (err: any) {
       console.error('AI Diagnosis error:', err);
       res.status(500).json({ message: err.message });
