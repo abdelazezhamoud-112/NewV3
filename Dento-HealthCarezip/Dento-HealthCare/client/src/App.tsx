@@ -693,8 +693,8 @@ function Dashboard() {
   const breadcrumbs = getBreadcrumbs();
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full flex-row-reverse">
+    <SidebarProvider defaultOpen={false} style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
         <AppSidebar activePage={activePage} onNavigate={handleNavigate} customPages={customPages} />
         <div className="flex flex-col flex-1">
           {/* Header with Navigation Controls */}
