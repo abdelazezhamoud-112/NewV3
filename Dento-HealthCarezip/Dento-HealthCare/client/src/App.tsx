@@ -100,143 +100,277 @@ function LanguageToggle({ language, onLanguageChange }: { language: "ar" | "en";
 }
 
 function HomePage({ userName, userType, onNavigate, language = "ar" }: { userName: string; userType: string; onNavigate?: (page: string) => void; language?: "ar" | "en" }) {
-  const t = {
-    ar: {
-      welcome: `مرحباً، ${userName}`,
-      system: "Dento Health Care - جامعة الدلتا للعلوم والتكنولوجيا",
-      stats: "إحصائيات لوحة التحكم",
-      treatments: "خطط العلاج",
-      appointments: "المواعيد",
-      medical: "السجل الطبي",
-      doctors: "أطباء",
-      clinics: "العيادات",
-      chat: "دردشة المساعد",
-      todayAppointments: "مواعيد اليوم",
-      activeTreatments: "خطط علاج نشطة",
-      totalClinics: "العيادات",
-      pendingPayments: "مدفوعات معلقة",
-    },
-    en: {
-      welcome: `Welcome, ${userName}`,
-      system: "Dento Health Care - Delta University of Science and Technology",
-      stats: "Dashboard Statistics",
-      treatments: "Treatment Plans",
-      appointments: "Appointments",
-      medical: "Medical Records",
-      doctors: "Doctors",
-      clinics: "Clinics",
-      chat: "Assistant Chat",
-      todayAppointments: "Today's Appointments",
-      activeTreatments: "Active Treatments",
-      totalClinics: "Clinics",
-      pendingPayments: "Pending Payments",
+  const today = new Date();
+  const dayNames = language === "ar" 
+    ? ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
+    : ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const monthNames = language === "ar"
+    ? ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+    : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  
+  const greeting = () => {
+    const hour = today.getHours();
+    if (language === "ar") {
+      if (hour < 12) return "صباح الخير";
+      if (hour < 18) return "مساء الخير";
+      return "مساء الخير";
+    } else {
+      if (hour < 12) return "Good Morning";
+      if (hour < 18) return "Good Afternoon";
+      return "Good Evening";
     }
   };
-  const lang = t[language];
-  
-  const statsCards = [
-    { title: lang.todayAppointments, value: "3", icon: "📅", color: "border-l-teal-500 bg-teal-50 dark:bg-teal-950/30" },
-    { title: lang.activeTreatments, value: "2", icon: "🦷", color: "border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/30" },
-    { title: lang.totalClinics, value: "12", icon: "🏥", color: "border-l-cyan-500 bg-cyan-50 dark:bg-cyan-950/30" },
-    { title: lang.pendingPayments, value: "850 ج.م", icon: "💳", color: "border-l-amber-500 bg-amber-50 dark:bg-amber-950/30" },
+
+  const treatmentSteps = [
+    { id: "1", title: language === "ar" ? "الفحص" : "Checkup", status: "completed" },
+    { id: "2", title: language === "ar" ? "الأشعة" : "X-Ray", status: "completed" },
+    { id: "3", title: language === "ar" ? "التنظيف" : "Cleaning", status: "current" },
+    { id: "4", title: language === "ar" ? "الحشو" : "Filling", status: "pending" },
+    { id: "5", title: language === "ar" ? "المتابعة" : "Follow-up", status: "pending" },
   ];
-  
-  const mockTreatmentSteps = [
-    {
-      id: "1",
-      title: "الفحص الأولي والأشعة",
-      description: "فحص شامل للفم والأسنان مع أخذ الأشعة اللازمة",
-      status: "completed" as const,
-      date: "2025-10-15",
-    },
-    {
-      id: "2",
-      title: "تنظيف الأسنان وإزالة الجير",
-      description: "جلسة تنظيف عميق للأسنان وإزالة الجير والبلاك",
-      status: "in-progress" as const,
-      date: "2025-10-28",
-    },
-    {
-      id: "3",
-      title: "حشو الضرس الأول",
-      description: "حشو تجميلي للضرس المصاب بالتسوس",
-      status: "pending" as const,
-    },
+
+  const quickActions = [
+    { icon: "📅", label: language === "ar" ? "حجز موعد" : "Book", page: "appointments", color: "bg-teal-500" },
+    { icon: "💬", label: language === "ar" ? "تواصل" : "Chat", page: "chat", color: "bg-emerald-500" },
+    { icon: "📋", label: language === "ar" ? "السجل" : "Records", page: "medical-records", color: "bg-cyan-500" },
+    { icon: "💳", label: language === "ar" ? "الدفع" : "Pay", page: "payment", color: "bg-amber-500" },
+    { icon: "🆘", label: language === "ar" ? "طوارئ" : "Emergency", page: "chat", color: "bg-red-500" },
   ];
+
+  const healthTips = language === "ar" ? [
+    "تنظيف الأسنان بعد الأكل بـ30 دقيقة أفضل من التنظيف الفوري!",
+    "استخدم خيط الأسنان مرة واحدة يومياً على الأقل",
+    "قم بزيارة طبيب الأسنان كل 6 أشهر للفحص الدوري",
+    "تجنب المشروبات الغازية والسكريات للحفاظ على أسنانك",
+  ] : [
+    "Brushing 30 minutes after eating is better than immediately!",
+    "Use dental floss at least once daily",
+    "Visit your dentist every 6 months for regular checkups",
+    "Avoid sugary drinks to maintain healthy teeth",
+  ];
+
+  const tipIndex = today.getDate() % healthTips.length;
+  const dailyTip = healthTips[tipIndex];
+  const completedSteps = treatmentSteps.filter(s => s.status === "completed").length;
+  const progressPercent = Math.round((completedSteps / treatmentSteps.length) * 100);
+  const isRTL = language === "ar";
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-1">{lang.welcome}</h1>
-        <p className="text-slate-500 dark:text-slate-400">{lang.system}</p>
+      {/* Welcome Header with Greeting */}
+      <div className="bg-gradient-to-l from-teal-500 to-teal-600 rounded-2xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-teal-100 text-sm mb-1">
+              {dayNames[today.getDay()]}، {today.getDate()} {monthNames[today.getMonth()]} {today.getFullYear()}
+            </p>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">
+              {greeting()}، {userName}! 👋
+            </h1>
+            <p className="text-teal-100">
+              {language === "ar" ? "ابتسامتك تبدأ من هنا" : "Your smile starts here"}
+            </p>
+          </div>
+          <div className="hidden md:block text-6xl">😊</div>
+        </div>
       </div>
 
-      {/* Quick Stats Cards */}
+      {/* Status Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsCards.map((stat, index) => (
-          <div 
-            key={index}
-            className={`bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border-l-4 ${stat.color} transition-all hover:shadow-md cursor-pointer`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{stat.title}</p>
-                <p className="text-2xl font-bold text-slate-800 dark:text-white">{stat.value}</p>
-              </div>
-              <span className="text-3xl">{stat.icon}</span>
+        {/* Next Appointment */}
+        <button 
+          className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all text-right w-full"
+          onClick={() => onNavigate?.("appointments")}
+          aria-label={language === "ar" ? "عرض الموعد القادم" : "View next appointment"}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center">
+              <span className="text-xl">📅</span>
+            </div>
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              {language === "ar" ? "الموعد القادم" : "Next Appointment"}
+            </span>
+          </div>
+          <p className="text-lg font-bold text-slate-800 dark:text-white">28 {language === "ar" ? "يناير" : "Jan"}</p>
+          <p className="text-sm text-teal-600 dark:text-teal-400">د. محمد أحمد</p>
+          <p className="text-xs text-slate-400">عيادة التنظيف</p>
+        </button>
+
+        {/* Treatment Progress */}
+        <button 
+          className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all text-right w-full"
+          onClick={() => onNavigate?.("treatment-plans")}
+          aria-label={language === "ar" ? "عرض تقدم العلاج" : "View treatment progress"}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+              <span className="text-xl">📊</span>
+            </div>
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              {language === "ar" ? "تقدم العلاج" : "Treatment Progress"}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative w-14 h-14">
+              <svg className="w-14 h-14 transform -rotate-90">
+                <circle cx="28" cy="28" r="24" stroke="currentColor" strokeWidth="4" fill="none" className="text-slate-200 dark:text-slate-700" />
+                <circle cx="28" cy="28" r="24" stroke="currentColor" strokeWidth="4" fill="none" 
+                  className="text-emerald-500" 
+                  strokeDasharray={`${progressPercent * 1.51} 151`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-800 dark:text-white">
+                {progressPercent}%
+              </span>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800 dark:text-white">{completedSteps}/{treatmentSteps.length}</p>
+              <p className="text-xs text-slate-400">{language === "ar" ? "مراحل مكتملة" : "Steps done"}</p>
             </div>
           </div>
-        ))}
+        </button>
+
+        {/* Balance */}
+        <button 
+          className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all text-right w-full"
+          onClick={() => onNavigate?.("payment")}
+          aria-label={language === "ar" ? "عرض الفواتير والدفع" : "View billing and payments"}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+              <span className="text-xl">💳</span>
+            </div>
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              {language === "ar" ? "الرصيد المستحق" : "Balance Due"}
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-slate-800 dark:text-white">850</p>
+          <p className="text-sm text-amber-600 dark:text-amber-400">{language === "ar" ? "جنيه مصري" : "EGP"}</p>
+        </button>
+
+        {/* Health Status */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 text-right">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+              <span className="text-xl">😊</span>
+            </div>
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              {language === "ar" ? "حالتك الصحية" : "Health Status"}
+            </span>
+          </div>
+          <p className="text-lg font-bold text-green-600 dark:text-green-400">
+            {language === "ar" ? "جيدة جداً" : "Very Good"}
+          </p>
+          <p className="text-xs text-slate-400">{language === "ar" ? "آخر فحص: قبل أسبوع" : "Last check: 1 week ago"}</p>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
+        <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-4">
+          {language === "ar" ? "⚡ إجراءات سريعة" : "⚡ Quick Actions"}
+        </h3>
+        <div className="flex justify-around">
+          {quickActions.map((action, index) => (
+            <button
+              key={index}
+              onClick={() => onNavigate?.(action.page)}
+              className="flex flex-col items-center gap-2 group"
+              aria-label={action.label}
+            >
+              <div className={`w-14 h-14 ${action.color} rounded-full flex items-center justify-center text-2xl shadow-md group-hover:scale-110 transition-transform`}>
+                {action.icon}
+              </div>
+              <span className="text-xs text-slate-600 dark:text-slate-300">{action.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Treatment Timeline */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+            {language === "ar" ? "📈 رحلة علاجك" : "📈 Your Treatment Journey"}
+          </h3>
+          <button 
+            onClick={() => onNavigate?.("treatment-plans")}
+            className="text-xs text-teal-600 hover:text-teal-700 dark:text-teal-400"
+            aria-label={language === "ar" ? "عرض تفاصيل الخطة العلاجية" : "View treatment plan details"}
+          >
+            {isRTL ? "← عرض التفاصيل" : "View Details →"}
+          </button>
+        </div>
+        <div className="flex items-center justify-between">
+          {treatmentSteps.map((step, index) => (
+            <div key={step.id} className="flex items-center">
+              <div className="flex flex-col items-center">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold
+                  ${step.status === "completed" ? "bg-emerald-500" : 
+                    step.status === "current" ? "bg-teal-500 ring-4 ring-teal-200 dark:ring-teal-900" : 
+                    "bg-slate-300 dark:bg-slate-600"}`}
+                >
+                  {step.status === "completed" ? "✓" : index + 1}
+                </div>
+                <span className={`text-xs mt-2 text-center max-w-16
+                  ${step.status === "current" ? "text-teal-600 dark:text-teal-400 font-semibold" : "text-slate-500 dark:text-slate-400"}`}
+                >
+                  {step.title}
+                </span>
+              </div>
+              {index < treatmentSteps.length - 1 && (
+                <div className={`w-8 md:w-12 h-1 mx-1 rounded
+                  ${step.status === "completed" ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"}`} 
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom Row: Health Tip + Messages */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Health Tip */}
+        <div className="bg-gradient-to-l from-cyan-50 to-teal-50 dark:from-cyan-950/30 dark:to-teal-950/30 rounded-xl p-5 border border-teal-200 dark:border-teal-800">
+          <div className="flex items-start gap-3">
+            <span className="text-3xl">💡</span>
+            <div>
+              <h3 className="font-semibold text-teal-800 dark:text-teal-200 mb-2">
+                {language === "ar" ? "نصيحة اليوم" : "Tip of the Day"}
+              </h3>
+              <p className="text-sm text-teal-700 dark:text-teal-300">{dailyTip}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <button 
+          className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all text-right w-full"
+          onClick={() => onNavigate?.("chat")}
+          aria-label={language === "ar" ? "عرض الرسائل الجديدة" : "View new messages"}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <span className="text-3xl">📱</span>
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">2</span>
+              </div>
+              <div className="text-right">
+                <h3 className="font-semibold text-slate-800 dark:text-white">
+                  {language === "ar" ? "رسائل جديدة" : "New Messages"}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {language === "ar" ? "لديك رسالة من د. محمد" : "Message from Dr. Mohamed"}
+                </p>
+              </div>
+            </div>
+            <span className="text-slate-400">{isRTL ? "←" : "→"}</span>
+          </div>
+        </button>
       </div>
 
       {userType !== "patient" && <DashboardStats />}
-
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-            {userType === "patient" ? (
-              <TreatmentPlanCard
-                patientName={userName}
-                planTitle="خطة علاج التسوس والتنظيف"
-                steps={mockTreatmentSteps}
-                onUpdateStep={(id) => console.log("تحديث الخطوة:", id)}
-                onViewDetails={() => {
-                  console.log("عرض تفاصيل الخطة العلاجية");
-                  onNavigate?.("treatment-plan-detail");
-                }}
-              />
-            ) : (
-              <PatientList
-                clinicName="جميع العيادات"
-                onViewPatient={(id) => console.log("عرض المريض:", id)}
-              />
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <UserProfileCard
-              name={userName}
-              userType={userType as any}
-              email={`${userName.split(" ")[0].toLowerCase()}@hospital.com`}
-              phone="0100-123-4567"
-              joinDate="2025-10-01"
-            />
-          </div>
-
-          {userType !== "patient" && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <ReportsList
-                onViewReport={(id) => console.log("عرض التقرير:", id)}
-                onAddReport={() => console.log("إضافة تقرير")}
-              />
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
