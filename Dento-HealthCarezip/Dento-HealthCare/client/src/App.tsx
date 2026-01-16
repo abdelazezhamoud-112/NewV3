@@ -821,9 +821,55 @@ function Dashboard() {
               </div>
             ) : (
               <>
-            {activePage === "home" && <Router userName={userName} userType={userType} customPages={customPages} setCustomPages={setCustomPages} language={language} />}
+            {activePage === "home" && <HomePage userName={userName} userType={userType} onNavigate={handleNavigate} language={language} />}
+            {activePage === "treatment-plans" && (
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">الخطة العلاجية للمريض</h1>
+                  <p className="text-slate-500 dark:text-slate-400">متابعة مراحل العلاج الخاصة بك</p>
+                </div>
+                <TreatmentPlanCard
+                  patientName={userName}
+                  planTitle="خطة علاج التسوس والتنظيف"
+                  steps={[
+                    {
+                      id: "1",
+                      title: "الفحص الأولي والأشعة",
+                      description: "فحص شامل للفم والأسنان مع أخذ الأشعة اللازمة",
+                      status: "completed",
+                      date: "2025-10-15",
+                    },
+                    {
+                      id: "2",
+                      title: "تنظيف الأسنان وإزالة الجير",
+                      description: "جلسة تنظيف عميق للأسنان وإزالة الجير والبلاك",
+                      status: "in-progress",
+                      date: "2025-10-28",
+                    },
+                    {
+                      id: "3",
+                      title: "حشو الضرس الأول",
+                      description: "حشو تجميلي للضرس المصاب بالتسوس",
+                      status: "pending",
+                    },
+                  ]}
+                  onUpdateStep={(id) => console.log("تحديث الخطوة:", id)}
+                  onViewDetails={() => handleNavigate("treatment-plan-detail")}
+                />
+              </div>
+            )}
+            {activePage === "dentocad" && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center p-12 bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 max-w-md">
+                  <div className="text-6xl mb-6">🦷</div>
+                  <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-4">Dentocad</h1>
+                  <p className="text-xl text-teal-600 dark:text-teal-400 font-semibold mb-3">Coming Soon</p>
+                  <p className="text-slate-500 dark:text-slate-400">نعمل على تطوير هذه الميزة. ترقبوا التحديثات القادمة!</p>
+                </div>
+              </div>
+            )}
             {activePage === "treatment-plan-detail" && (
-              <TreatmentPlanDetailPage onBackClick={() => setActivePage("home")} />
+              <TreatmentPlanDetailPage onBackClick={() => handleNavigate("treatment-plans")} />
             )}
             {activePage === "appointments" && <AppointmentBookingPageNew />}
             {activePage === "doctors" && <DoctorManagementPage />}
@@ -839,13 +885,15 @@ function Dashboard() {
             {activePage === "ai-diagnosis" && <AIDiagnosisPage />}
             {activePage === "clinics" && <ClinicsOverviewPage onNavigate={setActivePage} />}
             {activePage.startsWith("clinic-") && <ClinicDetailPageNew clinicId={activePage.replace("clinic-", "")} onNavigate={setActivePage} />}
-            {!activePage.startsWith("home") && !activePage.startsWith("treatment-plan-detail") && 
+            {!activePage.startsWith("home") && !activePage.startsWith("treatment-plan") && 
+              !activePage.startsWith("dentocad") &&
               !activePage.startsWith("appointments") && !activePage.startsWith("doctors") &&
               !activePage.startsWith("medical-records") && !activePage.startsWith("ratings") &&
               !activePage.startsWith("notifications") && !activePage.startsWith("search") &&
               !activePage.startsWith("payment") && !activePage.startsWith("support-tickets") &&
               !activePage.startsWith("financial") && !activePage.startsWith("clinics") &&
-              !activePage.startsWith("clinic-") && !activePage.startsWith("ai-diagnosis") && (
+              !activePage.startsWith("clinic-") && !activePage.startsWith("ai-diagnosis") &&
+              !activePage.startsWith("reports") && !activePage.startsWith("chat") && (
               <Router userName={userName} userType={userType} customPages={customPages} setCustomPages={setCustomPages} language={language} />
             )}
             {userType === "patient" && <FloatingChatbot patientName={userName} />}
