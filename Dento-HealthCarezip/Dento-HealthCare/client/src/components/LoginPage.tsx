@@ -35,14 +35,34 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const [sessionTimeout, setSessionTimeout] = useState(false);
 
-  // Load remember me data on mount
+  // Load remember me data on mount and auto-login if session exists
   useEffect(() => {
-    const saved = localStorage.getItem("dentoRememberedUser");
-    if (saved) {
-      setUsername(saved);
+    const savedSession = localStorage.getItem("dentoUserSession");
+    if (savedSession) {
+      try {
+        const session = JSON.parse(savedSession);
+        if (session.username && session.userType && session.expiry > Date.now()) {
+          // Auto login with saved session
+          if (onLogin) {
+            onLogin(session.userType, session.username);
+          }
+          return;
+        } else {
+          // Session expired, remove it
+          localStorage.removeItem("dentoUserSession");
+        }
+      } catch (e) {
+        localStorage.removeItem("dentoUserSession");
+      }
+    }
+    
+    // Load remembered username only
+    const savedUsername = localStorage.getItem("dentoRememberedUser");
+    if (savedUsername) {
+      setUsername(savedUsername);
       setRememberMe(true);
     }
-  }, []);
+  }, [onLogin]);
 
   // Calculate password strength
   const getPasswordStrength = (pwd: string) => {
