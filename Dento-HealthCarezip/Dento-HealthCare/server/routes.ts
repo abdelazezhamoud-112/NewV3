@@ -34,11 +34,22 @@ function requireRole(...roles: string[]) {
   };
 }
 
+// Helper functions to map userId to patientId/doctorId
+async function getPatientIdFromUserId(userId: string): Promise<string | null> {
+  const patient = await storage.getPatientByUserId(userId);
+  return patient?.id || null;
+}
+
+async function getDoctorIdFromUserId(userId: string): Promise<string | null> {
+  const doctor = await storage.getDoctorByUserId(userId);
+  return doctor?.id || null;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { username, password, fullName, email, phone, userType } = req.body;
+      const { username, password, fullName, email, phone, userType, specialization, clinicId } = req.body;
       
       const existingUser = await storage.getUserByUsername(username);
       
@@ -57,6 +68,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phone: phone || null,
         userType: userType || 'patient',
       });
+      
+      // Create corresponding doctor or patient record based on userType
+      if (userType === 'doctor' || userType === 'graduate') {
+        await storage.createDoctor({
+          userId: newUser.id,
+          fullName: fullName,
+          specialization: specialization || 'General Dentistry',
+          clinicId: clinicId || null,
+          rating: 0,
+          reviewCount: 0,
+          isAvailable: true,
+        });
+      } else if (userType === 'patient' || userType === 'student') {
+        await storage.createPatient({
+          assignedToUserId: newUser.id,
+          fullName: fullName,
+          phone: phone || null,
+          clinicId: clinicId || null,
+        });
+      }
       
       req.session.userId = newUser.id;
       req.session.userType = newUser.userType;
@@ -219,13 +250,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/appointments', requireAuth, async (req, res) => {
     try {
-      if (req.session.userType === 'patient') {
-        const appointments = await storage.getAppointmentsByPatient(req.session.userId!);
-        return res.json(appointments);
+      if (req.session.userType === 'patient' || req.session.userType === 'student') {
+        // Get patient record from userId
+        const patient = await storage.getPatientByUserId(req.session.userId!);
+        if (patient) {
+          const appointments = await storage.getAppointmentsByPatient(patient.id);
+          return res.json(appointments);
+        }
+        return res.json([]);
       }
-      if (['doctor', 'student', 'graduate'].includes(req.session.userType || '')) {
-        const appointments = await storage.getAppointmentsByDoctor(req.session.userId!);
-        return res.json(appointments);
+      if (['doctor', 'graduate'].includes(req.session.userType || '')) {
+        // Get doctor record from userId
+        const doctor = await storage.getDoctorByUserId(req.session.userId!);
+        if (doctor) {
+          const appointments = await storage.getAppointmentsByDoctor(doctor.id);
+          return res.json(appointments);
+        }
+        return res.json([]);
       }
       const allAppointments = await storage.getAppointments();
       res.json(allAppointments);
@@ -240,12 +281,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!appointment) {
         return res.status(404).json({ message: 'الموعد غير موجود' });
       }
-      if (req.session.userType === 'patient' && appointment.patientId !== req.session.userId) {
-        return res.status(403).json({ message: 'غير مصرح لك بعرض هذا الموعد' });
+      // Check authorization using proper patientId/doctorId mapping
+      if (req.session.userType === 'patient' || req.session.userType === 'student') {
+        const patientId = await getPatientIdFromUserId(req.session.userId!);
+        if (appointment.patientId !== patientId) {
+          return res.status(403).json({ message: 'غير مصرح لك بعرض هذا الموعد' });
+        }
       }
-      if (['doctor', 'student', 'graduate'].includes(req.session.userType || '') && 
-          appointment.doctorId !== req.session.userId) {
-        return res.status(403).json({ message: 'غير مصرح لك بعرض هذا الموعد' });
+      if (['doctor', 'graduate'].includes(req.session.userType || '')) {
+        const doctorId = await getDoctorIdFromUserId(req.session.userId!);
+        if (appointment.doctorId !== doctorId) {
+          return res.status(403).json({ message: 'غير مصرح لك بعرض هذا الموعد' });
+        }
       }
       res.json(appointment);
     } catch (err: any) {
@@ -255,8 +302,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/appointments/patient/:patientId', requireAuth, async (req, res) => {
     try {
-      if (req.session.userType === 'patient' && req.params.patientId !== req.session.userId) {
-        return res.status(403).json({ message: 'غير مصرح لك بعرض مواعيد مريض آخر' });
+      // For patients, verify they're accessing their own records
+      if (req.session.userType === 'patient' || req.session.userType === 'student') {
+        const myPatientId = await getPatientIdFromUserId(req.session.userId!);
+        if (req.params.patientId !== myPatientId) {
+          return res.status(403).json({ message: 'غير مصرح لك بعرض مواعيد مريض آخر' });
+        }
       }
       const appointments = await storage.getAppointmentsByPatient(req.params.patientId);
       res.json(appointments);
@@ -267,7 +318,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/appointments/doctor/:doctorId', requireRole('doctor', 'student', 'graduate'), async (req, res) => {
     try {
-      if (req.params.doctorId !== req.session.userId) {
+      const myDoctorId = await getDoctorIdFromUserId(req.session.userId!);
+      if (req.params.doctorId !== myDoctorId) {
         return res.status(403).json({ message: 'غير مصرح لك بعرض مواعيد طبيب آخر' });
       }
       const appointments = await storage.getAppointmentsByDoctor(req.params.doctorId);
@@ -279,9 +331,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/doctor/today-appointments', requireRole('doctor', 'student', 'graduate'), async (req, res) => {
     try {
-      const doctorId = req.session.userId!;
+      // Get doctor record from userId
+      const doctor = await storage.getDoctorByUserId(req.session.userId!);
+      if (!doctor) {
+        return res.json([]);
+      }
       const today = new Date().toISOString().split('T')[0];
-      const appointments = await storage.getAppointmentsByDoctorAndDate(doctorId, today);
+      const appointments = await storage.getAppointmentsByDoctorAndDate(doctor.id, today);
       res.json(appointments);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -290,7 +346,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/appointments', requireAuth, async (req, res) => {
     try {
-      const appointment = await storage.createAppointment(req.body);
+      const appointmentData = { ...req.body };
+      
+      // For patient/student users: always derive patientId from session
+      if (req.session.userType === 'patient' || req.session.userType === 'student') {
+        const patientId = await getPatientIdFromUserId(req.session.userId!);
+        if (!patientId) {
+          return res.status(400).json({ message: 'لم يتم العثور على سجل المريض الخاص بك' });
+        }
+        appointmentData.patientId = patientId; // Always override for security
+      }
+      
+      // For doctor/graduate users: derive doctorId from session if not provided
+      if (req.session.userType === 'doctor' || req.session.userType === 'graduate') {
+        if (!appointmentData.doctorId) {
+          const doctorId = await getDoctorIdFromUserId(req.session.userId!);
+          if (doctorId) {
+            appointmentData.doctorId = doctorId;
+          }
+        }
+      }
+      
+      // Validate doctorId exists
+      if (appointmentData.doctorId) {
+        const doctor = await storage.getDoctor(appointmentData.doctorId);
+        if (!doctor) {
+          return res.status(400).json({ message: 'الطبيب المحدد غير موجود' });
+        }
+      }
+      
+      // Validate patientId exists
+      if (appointmentData.patientId) {
+        const patient = await storage.getPatient(appointmentData.patientId);
+        if (!patient) {
+          return res.status(400).json({ message: 'المريض المحدد غير موجود' });
+        }
+      }
+      
+      const appointment = await storage.createAppointment(appointmentData);
       res.status(201).json(appointment);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -303,12 +396,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existingAppointment) {
         return res.status(404).json({ message: 'الموعد غير موجود' });
       }
-      if (req.session.userType === 'patient' && existingAppointment.patientId !== req.session.userId) {
-        return res.status(403).json({ message: 'غير مصرح لك بتعديل هذا الموعد' });
+      // Check authorization using proper ID mapping
+      if (req.session.userType === 'patient' || req.session.userType === 'student') {
+        const patientId = await getPatientIdFromUserId(req.session.userId!);
+        if (existingAppointment.patientId !== patientId) {
+          return res.status(403).json({ message: 'غير مصرح لك بتعديل هذا الموعد' });
+        }
       }
-      if (['doctor', 'student', 'graduate'].includes(req.session.userType || '') && 
-          existingAppointment.doctorId !== req.session.userId) {
-        return res.status(403).json({ message: 'غير مصرح لك بتعديل هذا الموعد' });
+      if (['doctor', 'graduate'].includes(req.session.userType || '')) {
+        const doctorId = await getDoctorIdFromUserId(req.session.userId!);
+        if (existingAppointment.doctorId !== doctorId) {
+          return res.status(403).json({ message: 'غير مصرح لك بتعديل هذا الموعد' });
+        }
       }
       const appointment = await storage.updateAppointment(req.params.id, req.body);
       res.json(appointment);
@@ -328,8 +427,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/visit-sessions/patient/:patientId', requireAuth, async (req, res) => {
     try {
-      if (req.session.userType === 'patient' && req.params.patientId !== req.session.userId) {
-        return res.status(403).json({ message: 'غير مصرح لك بعرض جلسات مريض آخر' });
+      if (req.session.userType === 'patient' || req.session.userType === 'student') {
+        const myPatientId = await getPatientIdFromUserId(req.session.userId!);
+        if (req.params.patientId !== myPatientId) {
+          return res.status(403).json({ message: 'غير مصرح لك بعرض جلسات مريض آخر' });
+        }
       }
       const sessions = await storage.getVisitSessionsByPatient(req.params.patientId);
       res.json(sessions);
@@ -353,7 +455,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existingSession) {
         return res.status(404).json({ message: 'الجلسة غير موجودة' });
       }
-      if (existingSession.doctorId !== req.session.userId) {
+      const myDoctorId = await getDoctorIdFromUserId(req.session.userId!);
+      if (existingSession.doctorId !== myDoctorId) {
         return res.status(403).json({ message: 'غير مصرح لك بتعديل هذه الجلسة' });
       }
       const session = await storage.updateVisitSession(req.params.id, { 
@@ -372,7 +475,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'الموعد غير موجود' });
       }
       
-      if (appointment.doctorId !== req.session.userId) {
+      const myDoctorId = await getDoctorIdFromUserId(req.session.userId!);
+      if (appointment.doctorId !== myDoctorId) {
         return res.status(403).json({ message: 'غير مصرح لك بتأكيد حضور هذا الموعد' });
       }
       
@@ -423,8 +527,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/payments/patient/:patientId', requireAuth, async (req, res) => {
     try {
-      if (req.session.userType === 'patient' && req.params.patientId !== req.session.userId) {
-        return res.status(403).json({ message: 'غير مصرح لك بعرض مدفوعات مريض آخر' });
+      if (req.session.userType === 'patient' || req.session.userType === 'student') {
+        const myPatientId = await getPatientIdFromUserId(req.session.userId!);
+        if (req.params.patientId !== myPatientId) {
+          return res.status(403).json({ message: 'غير مصرح لك بعرض مدفوعات مريض آخر' });
+        }
       }
       const payments = await storage.getPaymentsByPatient(req.params.patientId);
       res.json(payments);
@@ -444,8 +551,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/patient/:patientId/balance', requireAuth, async (req, res) => {
     try {
-      if (req.session.userType === 'patient' && req.params.patientId !== req.session.userId) {
-        return res.status(403).json({ message: 'غير مصرح لك بعرض رصيد مريض آخر' });
+      if (req.session.userType === 'patient' || req.session.userType === 'student') {
+        const myPatientId = await getPatientIdFromUserId(req.session.userId!);
+        if (req.params.patientId !== myPatientId) {
+          return res.status(403).json({ message: 'غير مصرح لك بعرض رصيد مريض آخر' });
+        }
       }
       const balance = await storage.getPatientBalance(req.params.patientId);
       res.json(balance);

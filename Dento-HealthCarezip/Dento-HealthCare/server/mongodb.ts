@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema({
 });
 
 const patientSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  fullName: { type: String, required: true },
   age: { type: Number },
   gender: { type: String },
   phone: { type: String },
@@ -39,12 +39,15 @@ const patientSchema = new mongoose.Schema({
 });
 
 const doctorSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  fullName: { type: String, required: true },
   specialization: { type: String },
   phone: { type: String },
   email: { type: String },
   clinicId: { type: String },
   userId: { type: String },
+  rating: { type: Number, default: 0 },
+  reviewCount: { type: Number, default: 0 },
+  isAvailable: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now }
 });
 

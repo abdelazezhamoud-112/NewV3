@@ -10,6 +10,12 @@ function toPlainObject(doc: any): any {
   obj.id = obj._id?.toString() || obj.id;
   delete obj._id;
   delete obj.__v;
+  
+  // Fallback: map legacy 'name' field to 'fullName' for backward compatibility
+  if (!obj.fullName && obj.name) {
+    obj.fullName = obj.name;
+  }
+  
   return obj;
 }
 
