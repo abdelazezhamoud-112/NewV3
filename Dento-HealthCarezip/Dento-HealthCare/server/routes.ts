@@ -350,7 +350,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For patient/student users: always derive patientId from session
       if (req.session.userType === 'patient' || req.session.userType === 'student') {
-        const patientId = await getPatientIdFromUserId(req.session.userId!);
+        let patientId = await getPatientIdFromUserId(req.session.userId!);
+        
+        // Auto-create patient record for existing users without one
+        if (!patientId) {
+          const user = await storage.getUser(req.session.userId!);
+          if (user) {
+            const newPatient = await storage.createPatient({
+              assignedToUserId: user.id,
+              fullName: user.fullName,
+              phone: user.phone || null,
+              clinicId: null,
+            });
+            patientId = newPatient.id;
+          }
+        }
+        
         if (!patientId) {
           return res.status(400).json({ message: 'لم يتم العثور على سجل المريض الخاص بك' });
         }
