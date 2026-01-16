@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Clock, User, MapPin, DollarSign, Check, AlertCircle, Smartphone } from "lucide-react";
+import { Calendar, Clock, User, MapPin, DollarSign, Check, AlertCircle, Smartphone, Loader2 } from "lucide-react";
 
 interface Appointment {
   id: string;
@@ -21,85 +22,91 @@ interface Appointment {
   date: string;
   time: string;
   duration: number;
-  status: "confirmed" | "pending" | "cancelled";
+  status: "confirmed" | "pending" | "cancelled" | "scheduled" | "completed";
   consultationFee: number;
   reminderEnabled: boolean;
+  doctorId?: string;
+  patientId?: string;
 }
 
 interface Doctor {
   id: string;
-  name: string;
-  clinic: string;
+  fullName: string;
+  name?: string;
+  clinic?: string;
+  clinicId?: string;
   specialization: string;
   rating: number;
-  availability: string;
-  consultationFee: number;
+  availability?: string;
+  consultationFee?: number;
+  isAvailable?: boolean;
 }
 
 export default function AppointmentBookingPageNew() {
-  const [appointments, setAppointments] = useState<Appointment[]>([
-    {
-      id: "1",
-      doctorName: "د. محمد أحمد",
-      clinic: "التشخيص والأشعة",
-      date: "2025-11-25",
-      time: "10:00 AM",
-      duration: 30,
-      status: "confirmed",
-      consultationFee: 250,
-      reminderEnabled: true,
-    },
-    {
-      id: "2",
-      doctorName: "د. فاطمة علي",
-      clinic: "العلاج التحفظي",
-      date: "2025-11-28",
-      time: "2:00 PM",
-      duration: 45,
-      status: "pending",
-      consultationFee: 300,
-      reminderEnabled: true,
-    },
-  ]);
+  const queryClient = useQueryClient();
 
-  const doctors: Doctor[] = [
-    {
-      id: "1",
-      name: "د. محمد أحمد",
-      clinic: "التشخيص والأشعة",
-      specialization: "تشخيص وأشعة",
-      rating: 4.8,
-      availability: "09:00-17:00",
-      consultationFee: 250,
+  // Fetch doctors from API
+  const { data: doctorsData, isLoading: doctorsLoading } = useQuery<Doctor[]>({
+    queryKey: ["/api/doctors"],
+    queryFn: async () => {
+      const res = await fetch("/api/doctors");
+      if (!res.ok) throw new Error("Failed to fetch doctors");
+      return res.json();
     },
-    {
-      id: "2",
-      name: "د. فاطمة علي",
-      clinic: "العلاج التحفظي",
-      specialization: "علاج تحفظي",
-      rating: 4.6,
-      availability: "10:00-18:00",
-      consultationFee: 300,
+  });
+
+  // Fetch appointments from API
+  const { data: appointmentsData, isLoading: appointmentsLoading } = useQuery<any[]>({
+    queryKey: ["/api/appointments"],
+    queryFn: async () => {
+      const res = await fetch("/api/appointments", { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 401) return [];
+        throw new Error("Failed to fetch appointments");
+      }
+      return res.json();
     },
-    {
-      id: "3",
-      name: "د. سارة حسن",
-      clinic: "تجميل الأسنان",
-      specialization: "تجميل وتبييض",
-      rating: 4.9,
-      availability: "09:00-17:00",
-      consultationFee: 400,
+  });
+
+  // Create appointment mutation
+  const createAppointmentMutation = useMutation({
+    mutationFn: async (appointmentData: any) => {
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(appointmentData),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create appointment");
+      }
+      return res.json();
     },
-    {
-      id: "4",
-      name: "د. علي محمود",
-      clinic: "جراحة الفم والفكين",
-      specialization: "جراحة",
-      rating: 4.7,
-      availability: "11:00-19:00",
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+    },
+  });
+
+  const doctors: Doctor[] = doctorsData || [];
+  
+  // Map API appointments to display format
+  const appointments: Appointment[] = (appointmentsData || []).map((apt: any) => {
+    const doctor = doctors.find(d => d.id === apt.doctorId);
+    return {
+      id: apt.id,
+      doctorName: doctor?.fullName || doctor?.name || "طبيب",
+      clinic: doctor?.specialization || "",
+      date: apt.date,
+      time: apt.time,
+      duration: 30,
+      status: apt.status || "pending",
       consultationFee: 500,
-    },
-  ];
+      reminderEnabled: true,
+      doctorId: apt.doctorId,
+      patientId: apt.patientId,
+    };
+  });
 
   const timeSlots = [
     "09:00 AM",
@@ -124,42 +131,60 @@ export default function AppointmentBookingPageNew() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [showBookingForm, setShowBookingForm] = useState(false);
 
-  const handleBookAppointment = () => {
+  const handleBookAppointment = async () => {
     if (!selectedDoctor || !appointmentDate || !appointmentTime) {
       alert("الرجاء ملء جميع الحقول المطلوبة");
       return;
     }
 
-    const doctor = doctors.find((d) => d.id === selectedDoctor);
-    const newAppointment: Appointment = {
-      id: Date.now().toString(),
-      doctorName: doctor?.name || "",
-      clinic: doctor?.clinic || "",
-      date: appointmentDate,
-      time: appointmentTime,
-      duration: parseInt(duration),
-      status: "pending",
-      consultationFee: doctor?.consultationFee || 250,
-      reminderEnabled,
-    };
+    try {
+      await createAppointmentMutation.mutateAsync({
+        doctorId: selectedDoctor,
+        date: appointmentDate,
+        time: appointmentTime,
+        notes: "",
+      });
 
-    setAppointments([...appointments, newAppointment]);
-    setSelectedDoctor("");
-    setAppointmentDate("");
-    setAppointmentTime("");
-    setDuration("30");
-    setReminderEnabled(true);
-    setShowBookingForm(false);
+      setSelectedDoctor("");
+      setAppointmentDate("");
+      setAppointmentTime("");
+      setDuration("30");
+      setReminderEnabled(true);
+      setShowBookingForm(false);
 
-    alert("تم حجز الموعد بنجاح! سيتم تأكيده قريباً.");
+      alert("تم حجز الموعد بنجاح! سيتم تأكيده قريباً.");
+    } catch (error: any) {
+      alert(error.message || "حدث خطأ أثناء حجز الموعد");
+    }
   };
 
-  const handleCancelAppointment = (id: string) => {
-    setAppointments(
-      appointments.map((apt) =>
-        apt.id === id ? { ...apt, status: "cancelled" as const } : apt
-      )
-    );
+  // Cancel appointment mutation
+  const cancelAppointmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/appointments/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to cancel appointment");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+    },
+  });
+
+  const handleCancelAppointment = async (id: string) => {
+    try {
+      await cancelAppointmentMutation.mutateAsync(id);
+      alert("تم إلغاء الموعد بنجاح");
+    } catch (error: any) {
+      alert(error.message || "حدث خطأ أثناء إلغاء الموعد");
+    }
   };
 
   const filteredAppointments = appointments.filter((apt) =>
@@ -169,8 +194,10 @@ export default function AppointmentBookingPageNew() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
+      case "completed":
         return "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200";
       case "pending":
+      case "scheduled":
         return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200";
       case "cancelled":
         return "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200";
@@ -183,8 +210,12 @@ export default function AppointmentBookingPageNew() {
     switch (status) {
       case "confirmed":
         return "✓ مؤكد";
+      case "completed":
+        return "✓ مكتمل";
       case "pending":
         return "⏳ قيد الانتظار";
+      case "scheduled":
+        return "📅 مجدول";
       case "cancelled":
         return "✕ ملغي";
       default:
@@ -243,16 +274,27 @@ export default function AppointmentBookingPageNew() {
                       <SelectValue placeholder="اختر الطبيب المتخصص" />
                     </SelectTrigger>
                     <SelectContent>
-                      {doctors.map((doctor) => (
-                        <SelectItem key={doctor.id} value={doctor.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{doctor.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {doctor.rating}⭐
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {doctorsLoading ? (
+                        <div className="flex items-center justify-center p-4">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="mr-2">جاري التحميل...</span>
+                        </div>
+                      ) : doctors.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                          لا يوجد أطباء متاحين حالياً
+                        </div>
+                      ) : (
+                        doctors.map((doctor) => (
+                          <SelectItem key={doctor.id} value={doctor.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{doctor.fullName || doctor.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {doctor.rating || 0}⭐
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -263,28 +305,28 @@ export default function AppointmentBookingPageNew() {
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-semibold">{selectedDoctorData.name}</p>
+                          <p className="font-semibold">{selectedDoctorData.fullName || selectedDoctorData.name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {selectedDoctorData.specialization}
+                            {selectedDoctorData.specialization || "طب أسنان عام"}
                           </p>
                         </div>
-                        <Badge>{selectedDoctorData.rating}⭐</Badge>
+                        <Badge>{selectedDoctorData.rating || 0}⭐</Badge>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-sm pt-2 border-t">
                         <div>
                           <p className="text-xs text-muted-foreground">العيادة</p>
-                          <p className="font-semibold">{selectedDoctorData.clinic}</p>
+                          <p className="font-semibold">{selectedDoctorData.clinic || selectedDoctorData.specialization || "عيادة عامة"}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground">الأوقات</p>
+                          <p className="text-xs text-muted-foreground">الحالة</p>
                           <p className="font-semibold">
-                            {selectedDoctorData.availability}
+                            {selectedDoctorData.isAvailable !== false ? "متاح" : "غير متاح"}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">الرسم</p>
                           <p className="font-semibold text-primary">
-                            {selectedDoctorData.consultationFee} ج.م
+                            {selectedDoctorData.consultationFee || 500} ج.م
                           </p>
                         </div>
                       </div>
