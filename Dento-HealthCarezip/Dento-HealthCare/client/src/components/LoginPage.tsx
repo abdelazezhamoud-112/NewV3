@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import loginBg from "@assets/stock_images/modern_dental_hospit_e3518571.jpg";
 
 interface LoginPageProps {
-  onLogin?: (userType: string, username: string) => void;
+  onLogin?: (userType: string, username: string, userId?: string) => void;
   onSignUpClick?: () => void;
 }
 
@@ -33,7 +33,7 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
         const session = JSON.parse(savedSession);
         if (session.username && session.userType && session.expiry > Date.now()) {
           if (onLogin) {
-            onLogin(session.userType, session.username);
+            onLogin(session.userType, session.username, session.userId);
           }
           return;
         } else {
@@ -106,6 +106,7 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
         const session = {
           username: data.username,
           userType: data.userType || userType,
+          userId: data.id,
           expiry: Date.now() + (30 * 24 * 60 * 60 * 1000)
         };
         localStorage.setItem("dentoUserSession", JSON.stringify(session));
@@ -116,7 +117,7 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
       }
       
       if (onLogin) {
-        onLogin(data.userType || userType, data.username);
+        onLogin(data.userType || userType, data.username, data.id);
       }
     } catch (error) {
       setErrors({ 

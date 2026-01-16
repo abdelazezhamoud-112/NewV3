@@ -95,6 +95,38 @@ export const reports = pgTable("reports", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const visitSessions = pgTable("visit_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appointmentId: varchar("appointment_id").references(() => appointments.id, { onDelete: 'set null' }),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: 'cascade' }),
+  doctorId: varchar("doctor_id").notNull().references(() => doctors.id, { onDelete: 'restrict' }),
+  clinicId: varchar("clinic_id").notNull().references(() => clinics.id, { onDelete: 'restrict' }),
+  sessionDate: date("session_date").notNull(),
+  attendanceStatus: text("attendance_status").notNull().default("scheduled"),
+  price: numeric("price").notNull().default("500"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id, { onDelete: 'cascade' }),
+  amount: numeric("amount").notNull(),
+  paymentDate: timestamp("payment_date").defaultNow(),
+  paymentMethod: text("payment_method").notNull().default("cash"),
+  status: text("status").notNull().default("completed"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const clinicPrices = pgTable("clinic_prices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clinicId: varchar("clinic_id").notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+  sessionPrice: numeric("session_price").notNull().default("500"),
+  updatedBy: varchar("updated_by").references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
 });
@@ -130,6 +162,22 @@ export const insertReportSchema = createInsertSchema(reports).omit({
   createdAt: true,
 });
 
+export const insertVisitSessionSchema = createInsertSchema(visitSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  createdAt: true,
+  paymentDate: true,
+});
+
+export const insertClinicPriceSchema = createInsertSchema(clinicPrices).omit({
+  id: true,
+  updatedAt: true,
+});
+
 export const patientsRelations = relations(patients, ({ one, many }) => ({
   clinic: one(clinics, {
     fields: [patients.clinicId],
@@ -143,6 +191,8 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   treatments: many(treatments),
   treatmentPlans: many(treatmentPlans),
   reports: many(reports),
+  visitSessions: many(visitSessions),
+  payments: many(payments),
 }));
 
 export const doctorsRelations = relations(doctors, ({ one, many }) => ({
@@ -152,6 +202,7 @@ export const doctorsRelations = relations(doctors, ({ one, many }) => ({
   }),
   appointments: many(appointments),
   treatments: many(treatments),
+  visitSessions: many(visitSessions),
 }));
 
 export const appointmentsRelations = relations(appointments, ({ one }) => ({
@@ -207,11 +258,50 @@ export const clinicsRelations = relations(clinics, ({ many }) => ({
   doctors: many(doctors),
   treatmentPlans: many(treatmentPlans),
   reports: many(reports),
+  visitSessions: many(visitSessions),
+  clinicPrices: many(clinicPrices),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
   assignedPatients: many(patients),
   createdReports: many(reports),
+}));
+
+export const visitSessionsRelations = relations(visitSessions, ({ one }) => ({
+  appointment: one(appointments, {
+    fields: [visitSessions.appointmentId],
+    references: [appointments.id],
+  }),
+  patient: one(patients, {
+    fields: [visitSessions.patientId],
+    references: [patients.id],
+  }),
+  doctor: one(doctors, {
+    fields: [visitSessions.doctorId],
+    references: [doctors.id],
+  }),
+  clinic: one(clinics, {
+    fields: [visitSessions.clinicId],
+    references: [clinics.id],
+  }),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  patient: one(patients, {
+    fields: [payments.patientId],
+    references: [patients.id],
+  }),
+}));
+
+export const clinicPricesRelations = relations(clinicPrices, ({ one }) => ({
+  clinic: one(clinics, {
+    fields: [clinicPrices.clinicId],
+    references: [clinics.id],
+  }),
+  updatedByUser: one(users, {
+    fields: [clinicPrices.updatedBy],
+    references: [users.id],
+  }),
 }));
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -230,3 +320,9 @@ export type InsertTreatmentPlan = z.infer<typeof insertTreatmentPlanSchema>;
 export type TreatmentPlan = typeof treatmentPlans.$inferSelect;
 export type InsertReport = z.infer<typeof insertReportSchema>;
 export type Report = typeof reports.$inferSelect;
+export type InsertVisitSession = z.infer<typeof insertVisitSessionSchema>;
+export type VisitSession = typeof visitSessions.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
+export type InsertClinicPrice = z.infer<typeof insertClinicPriceSchema>;
+export type ClinicPrice = typeof clinicPrices.$inferSelect;

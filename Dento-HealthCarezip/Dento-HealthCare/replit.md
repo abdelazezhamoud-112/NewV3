@@ -128,6 +128,37 @@ client/src/services/api/
 - ✅ Action buttons مع data-testid
 - ✅ Cards و Tabs component من Shadcn
 
+## Recent Implementation Progress (January 2026)
+✅ **نظام الفوترة القائم على الحضور:**
+- **جداول قاعدة البيانات الجديدة:**
+  - `visit_sessions`: تتبع جلسات المرضى مع حالة الحضور (scheduled/attended/missed)
+  - `payments`: تسجيل المدفوعات مع الحالة (pending/completed/refunded)
+  - `clinic_prices`: أسعار الجلسات لكل عيادة (افتراضي 500 جنيه)
+- **حساب الرصيد:** الرصيد = مجموع الجلسات المحضورة - المدفوعات المكتملة
+- **تأكيد الحضور:** الطبيب فقط يمكنه تأكيد حضور المريض لإضافة المبلغ للرصيد
+
+✅ **نظام التحكم بالصلاحيات (RBAC):**
+- **Middleware:** requireAuth للمصادقة، requireRole للتحقق من نوع المستخدم
+- **أنواع المستخدمين:** patient, doctor, student, graduate
+- **حماية API:** كل endpoint محمي حسب الصلاحيات المطلوبة
+
+✅ **صفحات جديدة:**
+- **TodayAppointmentsPage:** للطبيب لعرض مواعيد اليوم وتأكيد الحضور
+- **PriceManagementPage:** للطبيب لإدارة أسعار الجلسات لكل عيادة
+
+✅ **Sidebar ديناميكي:**
+- يعرض صفحات مختلفة حسب نوع المستخدم
+- المرضى يرون: المواعيد، السجلات، المدفوعات
+- الأطباء يرون: مواعيد اليوم، إدارة الأسعار، المرضى
+
+✅ **أمان محسّن:**
+- doctorId يُستخرج من الجلسة وليس من الـ URL (حماية من IDOR)
+- userId يُمرر للـ HomePage لجلب الرصيد الصحيح
+
+**Test Accounts:**
+- Doctor: username=`doctor`, password=`doctor123`
+- Patient: username=`patient`, password=`patient123`
+
 ## Previous Implementation Progress (Turn 21-23)
 ✅ **Clinic Detail Page - Advanced Features:**
 - Added 8 comprehensive tabs: Overview, Doctors, Services, Equipment, Appointments, Booking, Policies, Reviews

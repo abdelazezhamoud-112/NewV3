@@ -46,6 +46,8 @@ import AppointmentsAnalyticsPage from "@/pages/AppointmentsAnalyticsPage";
 import DoctorProfilePage from "@/pages/DoctorProfilePage";
 import SignUpPage from "@/pages/SignUpPage";
 import AIDiagnosisPage from "@/pages/AIDiagnosisPage";
+import TodayAppointmentsPage from "@/components/TodayAppointmentsPage";
+import PriceManagementPage from "@/components/PriceManagementPage";
 import { Stethoscope, Syringe, Scissors, Layers, Building2, Moon, Sun, Activity, Sparkles, Baby, Smile, User, Globe, MessageCircle, ArrowRight, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -99,8 +101,18 @@ function LanguageToggle({ language, onLanguageChange }: { language: "ar" | "en";
   );
 }
 
-function HomePage({ userName, userType, onNavigate, language = "ar" }: { userName: string; userType: string; onNavigate?: (page: string) => void; language?: "ar" | "en" }) {
+function HomePage({ userName, userType, userId, onNavigate, language = "ar" }: { userName: string; userType: string; userId?: string; onNavigate?: (page: string) => void; language?: "ar" | "en" }) {
   const today = new Date();
+  const [balance, setBalance] = useState<number>(0);
+  
+  useEffect(() => {
+    if (userId) {
+      fetch(`/api/patient/${userId}/balance`)
+        .then(res => res.json())
+        .then(data => setBalance(data.balance || 0))
+        .catch(() => setBalance(0));
+    }
+  }, [userId]);
   const dayNames = language === "ar" 
     ? ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
     : ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -245,7 +257,7 @@ function HomePage({ userName, userType, onNavigate, language = "ar" }: { userNam
               {language === "ar" ? "الرصيد المستحق" : "Balance Due"}
             </span>
           </div>
-          <p className="text-2xl font-bold text-slate-800 dark:text-white">850</p>
+          <p className="text-2xl font-bold text-slate-800 dark:text-white">{balance}</p>
           <p className="text-sm text-amber-600 dark:text-amber-400">{language === "ar" ? "جنيه مصري" : "EGP"}</p>
         </button>
 
@@ -600,18 +612,19 @@ interface CustomPage {
 interface RouterProps {
   userName: string;
   userType: string;
+  userId?: string;
   customPages: CustomPage[];
   setCustomPages: (pages: CustomPage[]) => void;
   language?: "ar" | "en";
 }
 
-function Router({ userName, userType, customPages, setCustomPages, language = "ar" }: RouterProps) {
+function Router({ userName, userType, userId, customPages, setCustomPages, language = "ar" }: RouterProps) {
   const [activePage, setActivePage] = useState("home");
 
   return (
     <Switch>
       <Route path="/">
-        <HomePage userName={userName} userType={userType} onNavigate={setActivePage} language={language} />
+        <HomePage userName={userName} userType={userType} userId={userId} onNavigate={setActivePage} language={language} />
       </Route>
       <Route path="/clinics">
         <ClinicsPage />
@@ -712,6 +725,7 @@ function Dashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
   const [userType, setUserType] = useState("");
+  const [userId, setUserId] = useState("");
   const [activePage, setActivePage] = useState("home");
   const { language, setLanguage } = useLanguage();
   const [customPages, setCustomPages] = useState([
@@ -724,9 +738,10 @@ function Dashboard() {
   const historyIndex = useRef(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (type: string, username: string) => {
+  const handleLogin = (type: string, username: string, id?: string) => {
     setUserType(type);
     setUserName(username || "مستخدم");
+    setUserId(id || "");
     setIsLoggedIn(true);
   };
 
@@ -841,6 +856,12 @@ function Dashboard() {
       breadcrumbs.push({ name: "العيادات الطبية", path: activePage });
     } else if (activePage === "ai-diagnosis") {
       breadcrumbs.push({ name: "التشخيص الذكي", path: activePage });
+    } else if (activePage === "today-appointments") {
+      breadcrumbs.push({ name: language === "ar" ? "مواعيد اليوم" : "Today's Appointments", path: activePage });
+    } else if (activePage === "price-management") {
+      breadcrumbs.push({ name: language === "ar" ? "إدارة الأسعار" : "Price Management", path: activePage });
+    } else if (activePage === "patients") {
+      breadcrumbs.push({ name: language === "ar" ? "المرضى" : "Patients", path: activePage });
     }
     
     return breadcrumbs;
@@ -871,7 +892,7 @@ function Dashboard() {
   return (
     <SidebarProvider defaultOpen={false} style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
-        <AppSidebar activePage={activePage} onNavigate={handleNavigate} customPages={customPages} />
+        <AppSidebar activePage={activePage} onNavigate={handleNavigate} customPages={customPages} userType={userType} language={language} />
         <div className="flex flex-col flex-1">
           {/* Header with Navigation Controls */}
           <header className="flex items-center justify-between p-4 border-b bg-card gap-4">
@@ -955,7 +976,7 @@ function Dashboard() {
               </div>
             ) : (
               <>
-            {activePage === "home" && <HomePage userName={userName} userType={userType} onNavigate={handleNavigate} language={language} />}
+            {activePage === "home" && <HomePage userName={userName} userType={userType} userId={userId} onNavigate={handleNavigate} language={language} />}
             {activePage === "treatment-plans" && (
               <div className="space-y-6">
                 <div>
@@ -1017,6 +1038,8 @@ function Dashboard() {
             {activePage === "reports" && <ReportsPage />}
             {activePage === "chat" && <ChatBotPage />}
             {activePage === "ai-diagnosis" && <AIDiagnosisPage />}
+            {activePage === "today-appointments" && <TodayAppointmentsPage language={language} />}
+            {activePage === "price-management" && <PriceManagementPage language={language} />}
             {activePage === "clinics" && <ClinicsOverviewPage onNavigate={setActivePage} />}
             {activePage.startsWith("clinic-") && <ClinicDetailPageNew clinicId={activePage.replace("clinic-", "")} onNavigate={setActivePage} />}
             {!activePage.startsWith("home") && !activePage.startsWith("treatment-plan") && 
@@ -1027,8 +1050,10 @@ function Dashboard() {
               !activePage.startsWith("payment") && !activePage.startsWith("support-tickets") &&
               !activePage.startsWith("financial") && !activePage.startsWith("clinics") &&
               !activePage.startsWith("clinic-") && !activePage.startsWith("ai-diagnosis") &&
-              !activePage.startsWith("reports") && !activePage.startsWith("chat") && (
-              <Router userName={userName} userType={userType} customPages={customPages} setCustomPages={setCustomPages} language={language} />
+              !activePage.startsWith("reports") && !activePage.startsWith("chat") &&
+              !activePage.startsWith("today-appointments") && !activePage.startsWith("price-management") &&
+              !activePage.startsWith("patients") && (
+              <Router userName={userName} userType={userType} userId={userId} customPages={customPages} setCustomPages={setCustomPages} language={language} />
             )}
             {userType === "patient" && <FloatingChatbot patientName={userName} />}
               </>

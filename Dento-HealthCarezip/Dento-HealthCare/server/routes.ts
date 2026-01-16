@@ -1,84 +1,51 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import OpenAI from "openai";
-
-import User from "./models/User";
-import Clinic from "./models/Clinic";
-import Doctor from "./models/Doctor";
-import Patient from "./models/Patient";
-import Appointment from "./models/Appointment";
-import Treatment from "./models/Treatment";
-import TreatmentPlan from "./models/TreatmentPlan";
-import Report from "./models/Report";
+import { storage } from "./storage";
+import { 
+  insertUserSchema, insertPatientSchema, insertDoctorSchema, 
+  insertClinicSchema, insertAppointmentSchema, insertVisitSessionSchema,
+  insertPaymentSchema, insertClinicPriceSchema
+} from "@shared/schema";
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+declare module 'express-session' {
+  interface SessionData {
+    userId?: string;
+    userType?: string;
+  }
+}
+
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.userId) {
+    return res.status(401).json({ message: 'غير مسموح - يرجى تسجيل الدخول' });
+  }
+  next();
+}
+
+function requireRole(...roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ message: 'غير مسموح - يرجى تسجيل الدخول' });
+    }
+    if (!roles.includes(req.session.userType || '')) {
+      return res.status(403).json({ message: 'لا تملك صلاحية للوصول لهذه الصفحة' });
+    }
+    next();
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // User routes
-  app.get('/api/users', async (_req, res) => {
-    try {
-      const allUsers = await User.find();
-      res.json(allUsers);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get('/api/users/:id', async (req, res) => {
-    try {
-      const user = await User.findById(req.params.id);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-      res.json(user);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post('/api/users', async (req, res) => {
-    try {
-      const user = new User(req.body);
-      await user.save();
-      res.status(201).json(user);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.put('/api/users/:id', async (req, res) => {
-    try {
-      const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-      res.json(user);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.delete('/api/users/:id', async (req, res) => {
-    try {
-      const user = await User.findByIdAndDelete(req.params.id);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-      res.json(user);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // Authentication routes
+  
   app.post('/api/auth/register', async (req, res) => {
     try {
       const { username, password, fullName, email, phone, userType } = req.body;
       
-      const existingUser = await User.findOne({ username });
+      const existingUser = await storage.getUserByUsername(username);
       
       if (existingUser) {
         return res.status(400).json({ message: 'اسم المستخدم موجود بالفعل' });
@@ -87,7 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
       
-      const newUser = new User({
+      const newUser = await storage.createUser({
         username,
         password: hashedPassword,
         fullName,
@@ -96,10 +63,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userType: userType || 'patient',
       });
       
-      await newUser.save();
+      req.session.userId = newUser.id;
+      req.session.userType = newUser.userType;
       
-      const userObj = newUser.toObject();
-      const { password: _, ...userWithoutPassword } = userObj;
+      const { password: _, ...userWithoutPassword } = newUser;
       res.status(201).json(userWithoutPassword);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -110,7 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
       
-      const user = await User.findOne({ username });
+      const user = await storage.getUserByUsername(username);
       
       if (!user) {
         return res.status(401).json({ message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
@@ -122,18 +89,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
       }
       
-      const userObj = user.toObject();
-      const { password: _, ...userWithoutPassword } = userObj;
+      req.session.userId = user.id;
+      req.session.userType = user.userType;
+      
+      const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  // Clinic routes
+  app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: 'خطأ في تسجيل الخروج' });
+      }
+      res.json({ message: 'تم تسجيل الخروج بنجاح' });
+    });
+  });
+
+  app.get('/api/auth/me', async (req, res) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ message: 'غير مسجل الدخول' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'المستخدم غير موجود' });
+    }
+    const { password: _, ...userWithoutPassword } = user;
+    res.json(userWithoutPassword);
+  });
+
   app.get('/api/clinics', async (_req, res) => {
     try {
-      const allClinics = await Clinic.find();
+      const allClinics = await storage.getClinics();
       res.json(allClinics);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -142,9 +131,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/clinics/:id', async (req, res) => {
     try {
-      const clinic = await Clinic.findById(req.params.id);
+      const clinic = await storage.getClinic(req.params.id);
       if (!clinic) {
-        return res.status(404).json({ message: 'Clinic not found' });
+        return res.status(404).json({ message: 'العيادة غير موجودة' });
       }
       res.json(clinic);
     } catch (err: any) {
@@ -152,100 +141,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/clinics', async (req, res) => {
+  app.post('/api/clinics', requireRole('doctor', 'graduate'), async (req, res) => {
     try {
-      const clinic = new Clinic(req.body);
-      await clinic.save();
+      const parsed = insertClinicSchema.parse(req.body);
+      const clinic = await storage.createClinic(parsed);
       res.status(201).json(clinic);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   });
 
-  app.put('/api/clinics/:id', async (req, res) => {
-    try {
-      const clinic = await Clinic.findByIdAndUpdate(req.params.id, req.body, { new: true });
-      if (!clinic) {
-        return res.status(404).json({ message: 'Clinic not found' });
-      }
-      res.json(clinic);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.delete('/api/clinics/:id', async (req, res) => {
-    try {
-      const clinic = await Clinic.findByIdAndDelete(req.params.id);
-      if (!clinic) {
-        return res.status(404).json({ message: 'Clinic not found' });
-      }
-      res.json(clinic);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // Patient routes
-  app.get('/api/patients', async (_req, res) => {
-    try {
-      const allPatients = await Patient.find().populate('clinicId').populate('assignedToUserId');
-      res.json(allPatients);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get('/api/patients/:id', async (req, res) => {
-    try {
-      const patient = await Patient.findById(req.params.id).populate('clinicId').populate('assignedToUserId');
-      if (!patient) {
-        return res.status(404).json({ message: 'Patient not found' });
-      }
-      res.json(patient);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post('/api/patients', async (req, res) => {
-    try {
-      const patient = new Patient(req.body);
-      await patient.save();
-      res.status(201).json(patient);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.put('/api/patients/:id', async (req, res) => {
-    try {
-      const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, { new: true });
-      if (!patient) {
-        return res.status(404).json({ message: 'Patient not found' });
-      }
-      res.json(patient);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.delete('/api/patients/:id', async (req, res) => {
-    try {
-      const patient = await Patient.findByIdAndDelete(req.params.id);
-      if (!patient) {
-        return res.status(404).json({ message: 'Patient not found' });
-      }
-      res.json(patient);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // Doctor routes
   app.get('/api/doctors', async (_req, res) => {
     try {
-      const allDoctors = await Doctor.find().populate('clinicId');
+      const allDoctors = await storage.getDoctors();
       res.json(allDoctors);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -254,9 +162,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/doctors/:id', async (req, res) => {
     try {
-      const doctor = await Doctor.findById(req.params.id).populate('clinicId');
+      const doctor = await storage.getDoctor(req.params.id);
       if (!doctor) {
-        return res.status(404).json({ message: 'Doctor not found' });
+        return res.status(404).json({ message: 'الطبيب غير موجود' });
       }
       res.json(doctor);
     } catch (err: any) {
@@ -264,55 +172,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/doctors', async (req, res) => {
+  app.post('/api/doctors', requireRole('doctor', 'graduate'), async (req, res) => {
     try {
-      const doctor = new Doctor(req.body);
-      await doctor.save();
+      const parsed = insertDoctorSchema.parse(req.body);
+      const doctor = await storage.createDoctor(parsed);
       res.status(201).json(doctor);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   });
 
-  app.put('/api/doctors/:id', async (req, res) => {
+  app.get('/api/patients', requireAuth, async (req, res) => {
     try {
-      const doctor = await Doctor.findByIdAndUpdate(req.params.id, req.body, { new: true });
-      if (!doctor) {
-        return res.status(404).json({ message: 'Doctor not found' });
-      }
-      res.json(doctor);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.delete('/api/doctors/:id', async (req, res) => {
-    try {
-      const doctor = await Doctor.findByIdAndDelete(req.params.id);
-      if (!doctor) {
-        return res.status(404).json({ message: 'Doctor not found' });
-      }
-      res.json(doctor);
+      const allPatients = await storage.getPatients();
+      res.json(allPatients);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  // Appointment routes with populated patient and doctor data
-  app.get('/api/appointments', async (_req, res) => {
+  app.get('/api/patients/:id', requireAuth, async (req, res) => {
     try {
-      const allAppointments = await Appointment.find().populate('patientId').populate('doctorId');
+      const patient = await storage.getPatient(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ message: 'المريض غير موجود' });
+      }
+      res.json(patient);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/patients/user/:userId', requireAuth, async (req, res) => {
+    try {
+      const patient = await storage.getPatientByUserId(req.params.userId);
+      if (!patient) {
+        return res.status(404).json({ message: 'المريض غير موجود' });
+      }
+      res.json(patient);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/patients', requireAuth, async (req, res) => {
+    try {
+      const parsed = insertPatientSchema.parse(req.body);
+      const patient = await storage.createPatient(parsed);
+      res.status(201).json(patient);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/appointments', requireAuth, async (req, res) => {
+    try {
+      if (req.session.userType === 'patient') {
+        const appointments = await storage.getAppointmentsByPatient(req.session.userId!);
+        return res.json(appointments);
+      }
+      if (['doctor', 'student', 'graduate'].includes(req.session.userType || '')) {
+        const appointments = await storage.getAppointmentsByDoctor(req.session.userId!);
+        return res.json(appointments);
+      }
+      const allAppointments = await storage.getAppointments();
       res.json(allAppointments);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.get('/api/appointments/:id', async (req, res) => {
+  app.get('/api/appointments/:id', requireAuth, async (req, res) => {
     try {
-      const appointment = await Appointment.findById(req.params.id).populate('patientId').populate('doctorId');
+      const appointment = await storage.getAppointment(req.params.id);
       if (!appointment) {
-        return res.status(404).json({ message: 'Appointment not found' });
+        return res.status(404).json({ message: 'الموعد غير موجود' });
+      }
+      if (req.session.userType === 'patient' && appointment.patientId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بعرض هذا الموعد' });
+      }
+      if (['doctor', 'student', 'graduate'].includes(req.session.userType || '') && 
+          appointment.doctorId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بعرض هذا الموعد' });
       }
       res.json(appointment);
     } catch (err: any) {
@@ -320,218 +261,241 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/appointments', async (req, res) => {
+  app.get('/api/appointments/patient/:patientId', requireAuth, async (req, res) => {
     try {
-      const appointment = new Appointment(req.body);
-      await appointment.save();
+      if (req.session.userType === 'patient' && req.params.patientId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بعرض مواعيد مريض آخر' });
+      }
+      const appointments = await storage.getAppointmentsByPatient(req.params.patientId);
+      res.json(appointments);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/appointments/doctor/:doctorId', requireRole('doctor', 'student', 'graduate'), async (req, res) => {
+    try {
+      if (req.params.doctorId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بعرض مواعيد طبيب آخر' });
+      }
+      const appointments = await storage.getAppointmentsByDoctor(req.params.doctorId);
+      res.json(appointments);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/doctor/today-appointments', requireRole('doctor', 'student', 'graduate'), async (req, res) => {
+    try {
+      const doctorId = req.session.userId!;
+      const today = new Date().toISOString().split('T')[0];
+      const appointments = await storage.getAppointmentsByDoctorAndDate(doctorId, today);
+      res.json(appointments);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/appointments', requireAuth, async (req, res) => {
+    try {
+      const parsed = insertAppointmentSchema.parse(req.body);
+      const appointment = await storage.createAppointment(parsed);
       res.status(201).json(appointment);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   });
 
-  app.put('/api/appointments/:id', async (req, res) => {
+  app.put('/api/appointments/:id', requireAuth, async (req, res) => {
     try {
-      const appointment = await Appointment.findByIdAndUpdate(req.params.id, req.body, { new: true })
-        .populate('patientId')
-        .populate('doctorId');
-      if (!appointment) {
-        return res.status(404).json({ message: 'Appointment not found' });
+      const existingAppointment = await storage.getAppointment(req.params.id);
+      if (!existingAppointment) {
+        return res.status(404).json({ message: 'الموعد غير موجود' });
       }
+      if (req.session.userType === 'patient' && existingAppointment.patientId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بتعديل هذا الموعد' });
+      }
+      if (['doctor', 'student', 'graduate'].includes(req.session.userType || '') && 
+          existingAppointment.doctorId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بتعديل هذا الموعد' });
+      }
+      const appointment = await storage.updateAppointment(req.params.id, req.body);
       res.json(appointment);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   });
 
-  app.delete('/api/appointments/:id', async (req, res) => {
+  app.get('/api/visit-sessions', requireRole('doctor', 'student', 'graduate'), async (_req, res) => {
     try {
-      const appointment = await Appointment.findByIdAndDelete(req.params.id);
+      const sessions = await storage.getVisitSessions();
+      res.json(sessions);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/visit-sessions/patient/:patientId', requireAuth, async (req, res) => {
+    try {
+      if (req.session.userType === 'patient' && req.params.patientId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بعرض جلسات مريض آخر' });
+      }
+      const sessions = await storage.getVisitSessionsByPatient(req.params.patientId);
+      res.json(sessions);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/visit-sessions', requireRole('doctor', 'graduate'), async (req, res) => {
+    try {
+      const parsed = insertVisitSessionSchema.parse(req.body);
+      const session = await storage.createVisitSession(parsed);
+      res.status(201).json(session);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/visit-sessions/:id/attend', requireRole('doctor', 'graduate', 'student'), async (req, res) => {
+    try {
+      const existingSession = await storage.getVisitSession(req.params.id);
+      if (!existingSession) {
+        return res.status(404).json({ message: 'الجلسة غير موجودة' });
+      }
+      if (existingSession.doctorId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بتعديل هذه الجلسة' });
+      }
+      const session = await storage.updateVisitSession(req.params.id, { 
+        attendanceStatus: 'attended' 
+      });
+      res.json(session);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/appointments/:id/mark-attended', requireRole('doctor', 'graduate', 'student'), async (req, res) => {
+    try {
+      const appointment = await storage.getAppointment(req.params.id);
       if (!appointment) {
-        return res.status(404).json({ message: 'Appointment not found' });
+        return res.status(404).json({ message: 'الموعد غير موجود' });
       }
-      res.json(appointment);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // Treatment routes with populated patient and doctor data
-  app.get('/api/treatments', async (_req, res) => {
-    try {
-      const allTreatments = await Treatment.find().populate('patientId').populate('doctorId');
-      res.json(allTreatments);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get('/api/treatments/:id', async (req, res) => {
-    try {
-      const treatment = await Treatment.findById(req.params.id).populate('patientId').populate('doctorId');
-      if (!treatment) {
-        return res.status(404).json({ message: 'Treatment not found' });
+      
+      if (appointment.doctorId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بتأكيد حضور هذا الموعد' });
       }
-      res.json(treatment);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post('/api/treatments', async (req, res) => {
-    try {
-      const treatment = new Treatment(req.body);
-      await treatment.save();
-      res.status(201).json(treatment);
+      
+      if (appointment.status === 'completed') {
+        return res.status(400).json({ message: 'تم تأكيد حضور هذا الموعد مسبقاً' });
+      }
+      
+      const clinicId = req.body.clinicId;
+      if (!clinicId) {
+        return res.status(400).json({ message: 'يرجى تحديد العيادة' });
+      }
+      
+      const clinic = await storage.getClinic(clinicId);
+      if (!clinic) {
+        return res.status(400).json({ message: 'العيادة المحددة غير موجودة' });
+      }
+      
+      const clinicPrice = await storage.getClinicPrice(clinicId);
+      const sessionPrice = clinicPrice?.sessionPrice || "500";
+      
+      const session = await storage.createVisitSession({
+        appointmentId: appointment.id,
+        patientId: appointment.patientId,
+        doctorId: appointment.doctorId,
+        clinicId: clinicId,
+        sessionDate: appointment.date,
+        attendanceStatus: 'attended',
+        price: sessionPrice,
+        notes: req.body.notes || null,
+      });
+      
+      await storage.updateAppointment(req.params.id, { status: 'completed' });
+      
+      res.json({ appointment, session });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   });
 
-  app.put('/api/treatments/:id', async (req, res) => {
+  app.get('/api/payments', requireRole('doctor', 'student', 'graduate'), async (_req, res) => {
     try {
-      const treatment = await Treatment.findByIdAndUpdate(req.params.id, req.body, { new: true })
-        .populate('patientId')
-        .populate('doctorId');
-      if (!treatment) {
-        return res.status(404).json({ message: 'Treatment not found' });
+      const allPayments = await storage.getPayments();
+      res.json(allPayments);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/payments/patient/:patientId', requireAuth, async (req, res) => {
+    try {
+      if (req.session.userType === 'patient' && req.params.patientId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بعرض مدفوعات مريض آخر' });
       }
-      res.json(treatment);
+      const payments = await storage.getPaymentsByPatient(req.params.patientId);
+      res.json(payments);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/payments', requireRole('doctor', 'student', 'graduate'), async (req, res) => {
+    try {
+      const parsed = insertPaymentSchema.parse(req.body);
+      const payment = await storage.createPayment(parsed);
+      res.status(201).json(payment);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   });
 
-  app.delete('/api/treatments/:id', async (req, res) => {
+  app.get('/api/patient/:patientId/balance', requireAuth, async (req, res) => {
     try {
-      const treatment = await Treatment.findByIdAndDelete(req.params.id);
-      if (!treatment) {
-        return res.status(404).json({ message: 'Treatment not found' });
+      if (req.session.userType === 'patient' && req.params.patientId !== req.session.userId) {
+        return res.status(403).json({ message: 'غير مصرح لك بعرض رصيد مريض آخر' });
       }
-      res.json(treatment);
+      const balance = await storage.getPatientBalance(req.params.patientId);
+      res.json(balance);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  // Treatment Plan routes with populated patient and clinic data
-  app.get('/api/treatment-plans', async (_req, res) => {
+  app.get('/api/clinic-prices', requireAuth, async (_req, res) => {
     try {
-      const allTreatmentPlans = await TreatmentPlan.find().populate('patientId').populate('clinicId');
-      res.json(allTreatmentPlans);
+      const prices = await storage.getClinicPrices();
+      res.json(prices);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.get('/api/treatment-plans/:id', async (req, res) => {
+  app.get('/api/clinic-prices/:clinicId', requireAuth, async (req, res) => {
     try {
-      const treatmentPlan = await TreatmentPlan.findById(req.params.id).populate('patientId').populate('clinicId');
-      if (!treatmentPlan) {
-        return res.status(404).json({ message: 'Treatment plan not found' });
-      }
-      res.json(treatmentPlan);
+      const price = await storage.getClinicPrice(req.params.clinicId);
+      res.json(price || { sessionPrice: "500" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.post('/api/treatment-plans', async (req, res) => {
+  app.put('/api/clinic-prices/:clinicId', requireRole('doctor'), async (req, res) => {
     try {
-      const treatmentPlan = new TreatmentPlan(req.body);
-      await treatmentPlan.save();
-      res.status(201).json(treatmentPlan);
+      const price = await storage.upsertClinicPrice({
+        clinicId: req.params.clinicId,
+        sessionPrice: req.body.sessionPrice,
+        updatedBy: req.session?.userId || null,
+      });
+      res.json(price);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   });
 
-  app.put('/api/treatment-plans/:id', async (req, res) => {
-    try {
-      const treatmentPlan = await TreatmentPlan.findByIdAndUpdate(req.params.id, req.body, { new: true })
-        .populate('patientId')
-        .populate('clinicId');
-      if (!treatmentPlan) {
-        return res.status(404).json({ message: 'Treatment plan not found' });
-      }
-      res.json(treatmentPlan);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.delete('/api/treatment-plans/:id', async (req, res) => {
-    try {
-      const treatmentPlan = await TreatmentPlan.findByIdAndDelete(req.params.id);
-      if (!treatmentPlan) {
-        return res.status(404).json({ message: 'Treatment plan not found' });
-      }
-      res.json(treatmentPlan);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // Report routes with populated patient, clinic and createdBy user data
-  app.get('/api/reports', async (_req, res) => {
-    try {
-      const allReports = await Report.find().populate('patientId').populate('clinicId').populate('createdBy');
-      res.json(allReports);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get('/api/reports/:id', async (req, res) => {
-    try {
-      const report = await Report.findById(req.params.id).populate('patientId').populate('clinicId').populate('createdBy');
-      if (!report) {
-        return res.status(404).json({ message: 'Report not found' });
-      }
-      res.json(report);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post('/api/reports', async (req, res) => {
-    try {
-      const report = new Report(req.body);
-      await report.save();
-      res.status(201).json(report);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.put('/api/reports/:id', async (req, res) => {
-    try {
-      const report = await Report.findByIdAndUpdate(req.params.id, req.body, { new: true })
-        .populate('patientId')
-        .populate('clinicId')
-        .populate('createdBy');
-      if (!report) {
-        return res.status(404).json({ message: 'Report not found' });
-      }
-      res.json(report);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.delete('/api/reports/:id', async (req, res) => {
-    try {
-      const report = await Report.findByIdAndDelete(req.params.id);
-      if (!report) {
-        return res.status(404).json({ message: 'Report not found' });
-      }
-      res.json(report);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // AI Diagnosis endpoint
   app.post('/api/ai/diagnosis', async (req, res) => {
     try {
       const { answers, xrayImage, language } = req.body;
