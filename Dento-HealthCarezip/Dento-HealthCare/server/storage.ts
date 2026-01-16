@@ -1,218 +1,232 @@
-import { 
-  users, patients, doctors, clinics, appointments, treatments, 
-  treatmentPlans, reports, visitSessions, payments, clinicPrices,
-  type User, type InsertUser, type Patient, type InsertPatient,
-  type Doctor, type InsertDoctor, type Clinic, type InsertClinic,
-  type Appointment, type InsertAppointment, type Treatment, type InsertTreatment,
-  type TreatmentPlan, type InsertTreatmentPlan, type Report, type InsertReport,
-  type VisitSession, type InsertVisitSession, type Payment, type InsertPayment,
-  type ClinicPrice, type InsertClinicPrice
-} from "@shared/schema";
-import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+import {
+  UserModel, PatientModel, DoctorModel, ClinicModel, AppointmentModel,
+  TreatmentModel, TreatmentPlanModel, ReportModel, VisitSessionModel,
+  PaymentModel, ClinicPriceModel
+} from "./mongodb";
 
-export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  getPatients(): Promise<Patient[]>;
-  getPatient(id: string): Promise<Patient | undefined>;
-  getPatientByUserId(userId: string): Promise<Patient | undefined>;
-  createPatient(patient: InsertPatient): Promise<Patient>;
-  getDoctors(): Promise<Doctor[]>;
-  getDoctor(id: string): Promise<Doctor | undefined>;
-  createDoctor(doctor: InsertDoctor): Promise<Doctor>;
-  getClinics(): Promise<Clinic[]>;
-  getClinic(id: string): Promise<Clinic | undefined>;
-  createClinic(clinic: InsertClinic): Promise<Clinic>;
-  getAppointments(): Promise<Appointment[]>;
-  getAppointment(id: string): Promise<Appointment | undefined>;
-  getAppointmentsByPatient(patientId: string): Promise<Appointment[]>;
-  getAppointmentsByDoctor(doctorId: string): Promise<Appointment[]>;
-  getAppointmentsByDoctorAndDate(doctorId: string, date: string): Promise<Appointment[]>;
-  createAppointment(appointment: InsertAppointment): Promise<Appointment>;
-  updateAppointment(id: string, data: Partial<Appointment>): Promise<Appointment | undefined>;
-  getVisitSessions(): Promise<VisitSession[]>;
-  getVisitSession(id: string): Promise<VisitSession | undefined>;
-  getVisitSessionsByPatient(patientId: string): Promise<VisitSession[]>;
-  createVisitSession(session: InsertVisitSession): Promise<VisitSession>;
-  updateVisitSession(id: string, data: Partial<VisitSession>): Promise<VisitSession | undefined>;
-  getPayments(): Promise<Payment[]>;
-  getPaymentsByPatient(patientId: string): Promise<Payment[]>;
-  createPayment(payment: InsertPayment): Promise<Payment>;
-  getPatientBalance(patientId: string): Promise<{ totalDue: number; totalPaid: number; balance: number }>;
-  getClinicPrices(): Promise<ClinicPrice[]>;
-  getClinicPrice(clinicId: string): Promise<ClinicPrice | undefined>;
-  upsertClinicPrice(price: InsertClinicPrice): Promise<ClinicPrice>;
+function toPlainObject(doc: any): any {
+  if (!doc) return undefined;
+  const obj = doc.toObject ? doc.toObject() : doc;
+  obj.id = obj._id?.toString() || obj.id;
+  delete obj._id;
+  delete obj.__v;
+  return obj;
 }
 
-export class DatabaseStorage implements IStorage {
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
+export interface IStorage {
+  getUser(id: string): Promise<any>;
+  getUserByUsername(username: string): Promise<any>;
+  createUser(user: any): Promise<any>;
+  getPatients(): Promise<any[]>;
+  getPatient(id: string): Promise<any>;
+  getPatientByUserId(userId: string): Promise<any>;
+  createPatient(patient: any): Promise<any>;
+  getDoctors(): Promise<any[]>;
+  getDoctor(id: string): Promise<any>;
+  getDoctorByUserId(userId: string): Promise<any>;
+  createDoctor(doctor: any): Promise<any>;
+  getClinics(): Promise<any[]>;
+  getClinic(id: string): Promise<any>;
+  createClinic(clinic: any): Promise<any>;
+  getAppointments(): Promise<any[]>;
+  getAppointment(id: string): Promise<any>;
+  getAppointmentsByPatient(patientId: string): Promise<any[]>;
+  getAppointmentsByDoctor(doctorId: string): Promise<any[]>;
+  getAppointmentsByDoctorAndDate(doctorId: string, date: string): Promise<any[]>;
+  createAppointment(appointment: any): Promise<any>;
+  updateAppointment(id: string, data: any): Promise<any>;
+  getVisitSessions(): Promise<any[]>;
+  getVisitSession(id: string): Promise<any>;
+  getVisitSessionsByPatient(patientId: string): Promise<any[]>;
+  createVisitSession(session: any): Promise<any>;
+  updateVisitSession(id: string, data: any): Promise<any>;
+  getPayments(): Promise<any[]>;
+  getPaymentsByPatient(patientId: string): Promise<any[]>;
+  createPayment(payment: any): Promise<any>;
+  getPatientBalance(patientId: string): Promise<{ totalDue: number; totalPaid: number; balance: number }>;
+  getClinicPrices(): Promise<any[]>;
+  getClinicPrice(clinicId: string): Promise<any>;
+  upsertClinicPrice(price: any): Promise<any>;
+}
+
+export class MongoStorage implements IStorage {
+  async getUser(id: string): Promise<any> {
+    const user = await UserModel.findById(id);
+    return toPlainObject(user);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user || undefined;
+  async getUserByUsername(username: string): Promise<any> {
+    const user = await UserModel.findOne({ username });
+    return toPlainObject(user);
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+  async createUser(insertUser: any): Promise<any> {
+    const user = await UserModel.create(insertUser);
+    return toPlainObject(user);
   }
 
-  async getPatients(): Promise<Patient[]> {
-    return await db.select().from(patients);
+  async getPatients(): Promise<any[]> {
+    const patients = await PatientModel.find();
+    return patients.map(toPlainObject);
   }
 
-  async getPatient(id: string): Promise<Patient | undefined> {
-    const [patient] = await db.select().from(patients).where(eq(patients.id, id));
-    return patient || undefined;
+  async getPatient(id: string): Promise<any> {
+    const patient = await PatientModel.findById(id);
+    return toPlainObject(patient);
   }
 
-  async getPatientByUserId(userId: string): Promise<Patient | undefined> {
-    const [patient] = await db.select().from(patients).where(eq(patients.assignedToUserId, userId));
-    return patient || undefined;
+  async getPatientByUserId(userId: string): Promise<any> {
+    const patient = await PatientModel.findOne({ assignedToUserId: userId });
+    return toPlainObject(patient);
   }
 
-  async createPatient(insertPatient: InsertPatient): Promise<Patient> {
-    const [patient] = await db.insert(patients).values(insertPatient).returning();
-    return patient;
+  async createPatient(insertPatient: any): Promise<any> {
+    const patient = await PatientModel.create(insertPatient);
+    return toPlainObject(patient);
   }
 
-  async getDoctors(): Promise<Doctor[]> {
-    return await db.select().from(doctors);
+  async getDoctors(): Promise<any[]> {
+    const doctors = await DoctorModel.find();
+    return doctors.map(toPlainObject);
   }
 
-  async getDoctor(id: string): Promise<Doctor | undefined> {
-    const [doctor] = await db.select().from(doctors).where(eq(doctors.id, id));
-    return doctor || undefined;
+  async getDoctor(id: string): Promise<any> {
+    const doctor = await DoctorModel.findById(id);
+    return toPlainObject(doctor);
   }
 
-  async createDoctor(insertDoctor: InsertDoctor): Promise<Doctor> {
-    const [doctor] = await db.insert(doctors).values(insertDoctor).returning();
-    return doctor;
+  async getDoctorByUserId(userId: string): Promise<any> {
+    const doctor = await DoctorModel.findOne({ userId });
+    return toPlainObject(doctor);
   }
 
-  async getClinics(): Promise<Clinic[]> {
-    return await db.select().from(clinics);
+  async createDoctor(insertDoctor: any): Promise<any> {
+    const doctor = await DoctorModel.create(insertDoctor);
+    return toPlainObject(doctor);
   }
 
-  async getClinic(id: string): Promise<Clinic | undefined> {
-    const [clinic] = await db.select().from(clinics).where(eq(clinics.id, id));
-    return clinic || undefined;
+  async getClinics(): Promise<any[]> {
+    const clinics = await ClinicModel.find();
+    return clinics.map(toPlainObject);
   }
 
-  async createClinic(insertClinic: InsertClinic): Promise<Clinic> {
-    const [clinic] = await db.insert(clinics).values(insertClinic).returning();
-    return clinic;
+  async getClinic(id: string): Promise<any> {
+    const clinic = await ClinicModel.findById(id);
+    return toPlainObject(clinic);
   }
 
-  async getAppointments(): Promise<Appointment[]> {
-    return await db.select().from(appointments);
+  async createClinic(insertClinic: any): Promise<any> {
+    const clinic = await ClinicModel.create(insertClinic);
+    return toPlainObject(clinic);
   }
 
-  async getAppointment(id: string): Promise<Appointment | undefined> {
-    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
-    return appointment || undefined;
+  async getAppointments(): Promise<any[]> {
+    const appointments = await AppointmentModel.find();
+    return appointments.map(toPlainObject);
   }
 
-  async getAppointmentsByPatient(patientId: string): Promise<Appointment[]> {
-    return await db.select().from(appointments).where(eq(appointments.patientId, patientId));
+  async getAppointment(id: string): Promise<any> {
+    const appointment = await AppointmentModel.findById(id);
+    return toPlainObject(appointment);
   }
 
-  async getAppointmentsByDoctor(doctorId: string): Promise<Appointment[]> {
-    return await db.select().from(appointments).where(eq(appointments.doctorId, doctorId));
+  async getAppointmentsByPatient(patientId: string): Promise<any[]> {
+    const appointments = await AppointmentModel.find({ patientId });
+    return appointments.map(toPlainObject);
   }
 
-  async getAppointmentsByDoctorAndDate(doctorId: string, date: string): Promise<Appointment[]> {
-    return await db.select().from(appointments).where(
-      and(eq(appointments.doctorId, doctorId), eq(appointments.date, date))
-    );
+  async getAppointmentsByDoctor(doctorId: string): Promise<any[]> {
+    const appointments = await AppointmentModel.find({ doctorId });
+    return appointments.map(toPlainObject);
   }
 
-  async createAppointment(insertAppointment: InsertAppointment): Promise<Appointment> {
-    const [appointment] = await db.insert(appointments).values(insertAppointment).returning();
-    return appointment;
+  async getAppointmentsByDoctorAndDate(doctorId: string, date: string): Promise<any[]> {
+    const appointments = await AppointmentModel.find({ doctorId, date });
+    return appointments.map(toPlainObject);
   }
 
-  async updateAppointment(id: string, data: Partial<Appointment>): Promise<Appointment | undefined> {
-    const [appointment] = await db.update(appointments).set(data).where(eq(appointments.id, id)).returning();
-    return appointment || undefined;
+  async createAppointment(insertAppointment: any): Promise<any> {
+    const appointment = await AppointmentModel.create(insertAppointment);
+    return toPlainObject(appointment);
   }
 
-  async getVisitSessions(): Promise<VisitSession[]> {
-    return await db.select().from(visitSessions);
+  async updateAppointment(id: string, data: any): Promise<any> {
+    const appointment = await AppointmentModel.findByIdAndUpdate(id, data, { new: true });
+    return toPlainObject(appointment);
   }
 
-  async getVisitSession(id: string): Promise<VisitSession | undefined> {
-    const [session] = await db.select().from(visitSessions).where(eq(visitSessions.id, id));
-    return session || undefined;
+  async getVisitSessions(): Promise<any[]> {
+    const sessions = await VisitSessionModel.find();
+    return sessions.map(toPlainObject);
   }
 
-  async getVisitSessionsByPatient(patientId: string): Promise<VisitSession[]> {
-    return await db.select().from(visitSessions).where(eq(visitSessions.patientId, patientId));
+  async getVisitSession(id: string): Promise<any> {
+    const session = await VisitSessionModel.findById(id);
+    return toPlainObject(session);
   }
 
-  async createVisitSession(insertSession: InsertVisitSession): Promise<VisitSession> {
-    const [session] = await db.insert(visitSessions).values(insertSession).returning();
-    return session;
+  async getVisitSessionsByPatient(patientId: string): Promise<any[]> {
+    const sessions = await VisitSessionModel.find({ patientId });
+    return sessions.map(toPlainObject);
   }
 
-  async updateVisitSession(id: string, data: Partial<VisitSession>): Promise<VisitSession | undefined> {
-    const [session] = await db.update(visitSessions).set(data).where(eq(visitSessions.id, id)).returning();
-    return session || undefined;
+  async createVisitSession(insertSession: any): Promise<any> {
+    const session = await VisitSessionModel.create(insertSession);
+    return toPlainObject(session);
   }
 
-  async getPayments(): Promise<Payment[]> {
-    return await db.select().from(payments);
+  async updateVisitSession(id: string, data: any): Promise<any> {
+    const session = await VisitSessionModel.findByIdAndUpdate(id, data, { new: true });
+    return toPlainObject(session);
   }
 
-  async getPaymentsByPatient(patientId: string): Promise<Payment[]> {
-    return await db.select().from(payments).where(eq(payments.patientId, patientId));
+  async getPayments(): Promise<any[]> {
+    const payments = await PaymentModel.find();
+    return payments.map(toPlainObject);
   }
 
-  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    const [payment] = await db.insert(payments).values(insertPayment).returning();
-    return payment;
+  async getPaymentsByPatient(patientId: string): Promise<any[]> {
+    const payments = await PaymentModel.find({ patientId });
+    return payments.map(toPlainObject);
+  }
+
+  async createPayment(insertPayment: any): Promise<any> {
+    const payment = await PaymentModel.create(insertPayment);
+    return toPlainObject(payment);
   }
 
   async getPatientBalance(patientId: string): Promise<{ totalDue: number; totalPaid: number; balance: number }> {
-    const attendedSessions = await db.select().from(visitSessions)
-      .where(and(eq(visitSessions.patientId, patientId), eq(visitSessions.attendanceStatus, "attended")));
+    const attendedSessions = await VisitSessionModel.find({ 
+      patientId, 
+      attendanceStatus: "attended" 
+    });
     
     const totalDue = attendedSessions.reduce((sum, session) => sum + parseFloat(session.price || "0"), 0);
     
-    const patientPayments = await db.select().from(payments)
-      .where(and(eq(payments.patientId, patientId), eq(payments.status, "completed")));
-    
+    const patientPayments = await PaymentModel.find({ patientId });
     const totalPaid = patientPayments.reduce((sum, payment) => sum + parseFloat(payment.amount || "0"), 0);
     
     return { totalDue, totalPaid, balance: totalDue - totalPaid };
   }
 
-  async getClinicPrices(): Promise<ClinicPrice[]> {
-    return await db.select().from(clinicPrices);
+  async getClinicPrices(): Promise<any[]> {
+    const prices = await ClinicPriceModel.find();
+    return prices.map(toPlainObject);
   }
 
-  async getClinicPrice(clinicId: string): Promise<ClinicPrice | undefined> {
-    const [price] = await db.select().from(clinicPrices).where(eq(clinicPrices.clinicId, clinicId));
-    return price || undefined;
+  async getClinicPrice(clinicId: string): Promise<any> {
+    const price = await ClinicPriceModel.findOne({ clinicId });
+    return toPlainObject(price);
   }
 
-  async upsertClinicPrice(insertPrice: InsertClinicPrice): Promise<ClinicPrice> {
-    const existing = await this.getClinicPrice(insertPrice.clinicId);
-    if (existing) {
-      const [updated] = await db.update(clinicPrices)
-        .set({ ...insertPrice, updatedAt: new Date() })
-        .where(eq(clinicPrices.clinicId, insertPrice.clinicId))
-        .returning();
-      return updated;
-    }
-    const [price] = await db.insert(clinicPrices).values(insertPrice).returning();
-    return price;
+  async upsertClinicPrice(insertPrice: any): Promise<any> {
+    const price = await ClinicPriceModel.findOneAndUpdate(
+      { clinicId: insertPrice.clinicId },
+      { ...insertPrice, updatedAt: new Date() },
+      { upsert: true, new: true }
+    );
+    return toPlainObject(price);
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MongoStorage();

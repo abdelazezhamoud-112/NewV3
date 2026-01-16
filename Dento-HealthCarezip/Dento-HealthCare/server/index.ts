@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { connectDB } from "./db";
+import { connectMongoDB } from "./mongodb";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 
 const app = express();
@@ -49,7 +49,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await connectDB();
+  await connectMongoDB();
   
   // Setup Replit Auth (before other routes)
   await setupAuth(app);

@@ -1,6 +1,4 @@
-import { users, type User } from "@shared/schema";
-import { db } from "../../db";
-import { eq } from "drizzle-orm";
+import { UserModel } from "../../mongodb";
 
 export type UpsertUser = {
   id: string;
@@ -11,36 +9,47 @@ export type UpsertUser = {
 };
 
 export interface IAuthStorage {
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  getUser(id: string): Promise<any>;
+  upsertUser(user: UpsertUser): Promise<any>;
 }
 
 class AuthStorage implements IAuthStorage {
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+  async getUser(id: string): Promise<any> {
+    const user = await UserModel.findById(id);
+    if (!user) return undefined;
+    const obj: any = user.toObject();
+    obj.id = obj._id?.toString();
+    delete obj._id;
+    delete obj.__v;
+    return obj;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values({
-        id: userData.id,
-        username: userData.email || userData.id,
-        password: "",
-        fullName: `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "User",
-        email: userData.email,
-        userType: "patient",
-      })
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          email: userData.email,
-          fullName: `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || undefined,
+  async upsertUser(userData: UpsertUser): Promise<any> {
+    const fullName = `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "User";
+    
+    const user = await UserModel.findByIdAndUpdate(
+      userData.id,
+      {
+        $setOnInsert: {
+          username: userData.email || userData.id,
+          password: "",
+          userType: "patient",
         },
-      })
-      .returning();
-    return user;
+        $set: {
+          email: userData.email,
+          fullName: fullName,
+        }
+      },
+      { upsert: true, new: true }
+    );
+    
+    const obj: any = user?.toObject();
+    if (obj) {
+      obj.id = obj._id?.toString();
+      delete obj._id;
+      delete obj.__v;
+    }
+    return obj;
   }
 }
 

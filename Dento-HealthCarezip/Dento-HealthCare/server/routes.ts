@@ -3,11 +3,6 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import OpenAI from "openai";
 import { storage } from "./storage";
-import { 
-  insertUserSchema, insertPatientSchema, insertDoctorSchema, 
-  insertClinicSchema, insertAppointmentSchema, insertVisitSessionSchema,
-  insertPaymentSchema, insertClinicPriceSchema
-} from "@shared/schema";
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -143,8 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/clinics', requireRole('doctor', 'graduate'), async (req, res) => {
     try {
-      const parsed = insertClinicSchema.parse(req.body);
-      const clinic = await storage.createClinic(parsed);
+      const clinic = await storage.createClinic(req.body);
       res.status(201).json(clinic);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -174,8 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/doctors', requireRole('doctor', 'graduate'), async (req, res) => {
     try {
-      const parsed = insertDoctorSchema.parse(req.body);
-      const doctor = await storage.createDoctor(parsed);
+      const doctor = await storage.createDoctor(req.body);
       res.status(201).json(doctor);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -217,8 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/patients', requireAuth, async (req, res) => {
     try {
-      const parsed = insertPatientSchema.parse(req.body);
-      const patient = await storage.createPatient(parsed);
+      const patient = await storage.createPatient(req.body);
       res.status(201).json(patient);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -298,8 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/appointments', requireAuth, async (req, res) => {
     try {
-      const parsed = insertAppointmentSchema.parse(req.body);
-      const appointment = await storage.createAppointment(parsed);
+      const appointment = await storage.createAppointment(req.body);
       res.status(201).json(appointment);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -349,8 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/visit-sessions', requireRole('doctor', 'graduate'), async (req, res) => {
     try {
-      const parsed = insertVisitSessionSchema.parse(req.body);
-      const session = await storage.createVisitSession(parsed);
+      const session = await storage.createVisitSession(req.body);
       res.status(201).json(session);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -445,8 +435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/payments', requireRole('doctor', 'student', 'graduate'), async (req, res) => {
     try {
-      const parsed = insertPaymentSchema.parse(req.body);
-      const payment = await storage.createPayment(parsed);
+      const payment = await storage.createPayment(req.body);
       res.status(201).json(payment);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
