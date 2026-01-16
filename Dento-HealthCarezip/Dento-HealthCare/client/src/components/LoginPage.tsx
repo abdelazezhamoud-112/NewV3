@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UserCircle, GraduationCap, Users, Stethoscope, LogIn, Globe, Moon, Sun, Volume2, Eye, EyeOff, AlertTriangle, CheckCircle, Zap, Check, X, HelpCircle, ShieldAlert, Clock, Lock, UserPlus, Apple } from "lucide-react";
+import { UserCircle, GraduationCap, Users, Stethoscope, LogIn, Globe, Moon, Sun, Volume2, Eye, EyeOff, AlertTriangle, CheckCircle, Zap, Check, X, HelpCircle, ShieldAlert, Clock, Lock, UserPlus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import loginBg from "@assets/stock_images/modern_dental_hospit_e3518571.jpg";
 
@@ -760,48 +760,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
                 >
                   {t.clearForm}
                 </Button>
-              </motion.div>
-
-              {/* Social Login */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.8 }}
-                className="space-y-3"
-              >
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-muted"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white dark:bg-slate-950 px-2 text-muted-foreground">{t.socialLogin}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={isLoading}
-                    onClick={() => window.location.href = "/api/login"}
-                    data-testid="button-google-login"
-                  >
-                    <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/></svg>
-                    Google
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={isLoading}
-                    onClick={() => window.location.href = "/api/login"}
-                    data-testid="button-apple-login"
-                  >
-                    <Apple className="w-4 h-4 mr-2" />
-                    Apple
-                  </Button>
-                </div>
               </motion.div>
 
               {/* Sign Up Link */}
