@@ -1,4 +1,4 @@
-import { Home, Hospital, FileText, Calendar, Settings, ChevronDown, SquareCode, Clock, Users, FileTextIcon, Star, Bell, Search, CreditCard, MessageSquare, DollarSign, Building2, Wand2, Brain } from "lucide-react";
+import { Home, Hospital, Calendar, Settings, ChevronDown, SquareCode, Clock, Users, FileTextIcon, Star, Search, CreditCard, Wand2, Brain } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -82,18 +82,6 @@ export default function AppSidebar({ activePage = "home", onNavigate, customPage
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => handleClick("clinics")}
-                  isActive={activePage === "clinics"}
-                  data-testid="nav-clinics-overview"
-                  className="font-semibold"
-                >
-                  <Building2 className="w-4 h-4" />
-                  <span>جميع العيادات</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
               <Collapsible defaultOpen className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
@@ -129,17 +117,6 @@ export default function AppSidebar({ activePage = "home", onNavigate, customPage
                 >
                   <Calendar className="w-4 h-4" />
                   <span>الخطة العلاجية للمريض</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => handleClick("reports")}
-                  isActive={activePage === "reports"}
-                  data-testid="nav-reports"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>التقارير</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -200,17 +177,6 @@ export default function AppSidebar({ activePage = "home", onNavigate, customPage
 
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => handleClick("notifications")}
-                  isActive={activePage === "notifications"}
-                  data-testid="nav-notifications"
-                >
-                  <Bell className="w-4 h-4" />
-                  <span>الإشعارات</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
                   onClick={() => handleClick("search")}
                   isActive={activePage === "search"}
                   data-testid="nav-search"
@@ -228,28 +194,6 @@ export default function AppSidebar({ activePage = "home", onNavigate, customPage
                 >
                   <CreditCard className="w-4 h-4" />
                   <span>الفواتير والدفع</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => handleClick("support-tickets")}
-                  isActive={activePage === "support-tickets"}
-                  data-testid="nav-support-tickets"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>تذاكر الدعم</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => handleClick("financial")}
-                  isActive={activePage === "financial"}
-                  data-testid="nav-financial"
-                >
-                  <DollarSign className="w-4 h-4" />
-                  <span>الإدارة المالية</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -276,25 +220,6 @@ export default function AppSidebar({ activePage = "home", onNavigate, customPage
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* الصفحات المخصصة */}
-              {customPages.length > 0 && (
-                <>
-                  <SidebarMenuItem className="mt-4 mb-2">
-                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">الصفحات المخصصة</div>
-                  </SidebarMenuItem>
-                  {customPages.map((page) => (
-                    <SidebarMenuItem key={page.id}>
-                      <SidebarMenuButton
-                        onClick={() => handleClick(`custom-page-${page.id}`)}
-                        isActive={activePage === `custom-page-${page.id}`}
-                        data-testid={`nav-custom-page-${page.id}`}
-                      >
-                        <span className="text-sm">{page.name}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
