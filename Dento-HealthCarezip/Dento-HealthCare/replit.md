@@ -40,7 +40,7 @@ The system is built on a modern web stack, characterized by a professional medic
 - **Frontend:** React + TypeScript + Vite, Wouter for routing, React Hook Form + Zod for forms, React Query + Tanstack Query v5 for state management.
 - **Styling:** Tailwind CSS, Shadcn UI, Framer Motion.
 - **Backend:** Express.js.
-- **Database:** PostgreSQL (Neon).
+- **Database:** MongoDB (via Mongoose).
 - **Icons:** Lucide React + React Icons.
 - **Charting:** Recharts for interactive graphs.
 - **File Structure:** Organized `client/src` with `pages` and `components` directories.
@@ -156,8 +156,14 @@ client/src/services/api/
 - userId يُمرر للـ HomePage لجلب الرصيد الصحيح
 
 **Test Accounts:**
-- Doctor: username=`doctor`, password=`doctor123`
-- Patient: username=`patient`, password=`patient123`
+- Use the accounts stored in your MongoDB database
+- Register new accounts via the registration form
+
+✅ **MongoDB Migration (January 2026):**
+- Migrated from PostgreSQL/Drizzle ORM to MongoDB/Mongoose
+- Session storage now uses connect-mongo
+- All collections: users, patients, doctors, clinics, appointments, treatments, treatmentplans, reports, visitsessions, payments, clinicprices
+- Authentication works with MongoDB UserModel
 
 ## Previous Implementation Progress (Turn 21-23)
 ✅ **Clinic Detail Page - Advanced Features:**
@@ -181,7 +187,7 @@ client/src/services/api/
 - Equipment data with year added and operational status
 
 ## External Dependencies
-- **Database:** PostgreSQL (via Neon)
+- **Database:** MongoDB (via Mongoose with MONGODB_URI)
 - **Payment Gateways:** Planned integration for Credit Card, Digital Wallets (Apple Pay/Google Pay), and Bank Transfer methods (currently simulated).
 - **Authentication:** Implied OAuth integrations for Google, Apple, and Facebook as mentioned in settings.
 
