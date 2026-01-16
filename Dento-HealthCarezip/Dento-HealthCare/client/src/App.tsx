@@ -111,6 +111,10 @@ function HomePage({ userName, userType, onNavigate, language = "ar" }: { userNam
       doctors: "أطباء",
       clinics: "العيادات",
       chat: "دردشة المساعد",
+      todayAppointments: "مواعيد اليوم",
+      activeTreatments: "خطط علاج نشطة",
+      totalClinics: "العيادات",
+      pendingPayments: "مدفوعات معلقة",
     },
     en: {
       welcome: `Welcome, ${userName}`,
@@ -122,9 +126,21 @@ function HomePage({ userName, userType, onNavigate, language = "ar" }: { userNam
       doctors: "Doctors",
       clinics: "Clinics",
       chat: "Assistant Chat",
+      todayAppointments: "Today's Appointments",
+      activeTreatments: "Active Treatments",
+      totalClinics: "Clinics",
+      pendingPayments: "Pending Payments",
     }
   };
   const lang = t[language];
+  
+  const statsCards = [
+    { title: lang.todayAppointments, value: "3", icon: "📅", color: "border-l-blue-500 bg-blue-50 dark:bg-blue-950/30" },
+    { title: lang.activeTreatments, value: "2", icon: "🦷", color: "border-l-green-500 bg-green-50 dark:bg-green-950/30" },
+    { title: lang.totalClinics, value: "12", icon: "🏥", color: "border-l-purple-500 bg-purple-50 dark:bg-purple-950/30" },
+    { title: lang.pendingPayments, value: "850 ج.م", icon: "💳", color: "border-l-orange-500 bg-orange-50 dark:bg-orange-950/30" },
+  ];
+  
   const mockTreatmentSteps = [
     {
       id: "1",
@@ -150,48 +166,74 @@ function HomePage({ userName, userType, onNavigate, language = "ar" }: { userNam
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-4xl font-bold mb-2">{lang.welcome}</h1>
-        <p className="text-muted-foreground text-lg">{lang.system}</p>
+      {/* Welcome Header */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-1">{lang.welcome}</h1>
+        <p className="text-slate-500 dark:text-slate-400">{lang.system}</p>
+      </div>
+
+      {/* Quick Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {statsCards.map((stat, index) => (
+          <div 
+            key={index}
+            className={`bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border-l-4 ${stat.color} transition-all hover:shadow-md cursor-pointer`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{stat.title}</p>
+                <p className="text-2xl font-bold text-slate-800 dark:text-white">{stat.value}</p>
+              </div>
+              <span className="text-3xl">{stat.icon}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       {userType !== "patient" && <DashboardStats />}
 
+      {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          {userType === "patient" ? (
-            <TreatmentPlanCard
-              patientName={userName}
-              planTitle="خطة علاج التسوس والتنظيف"
-              steps={mockTreatmentSteps}
-              onUpdateStep={(id) => console.log("تحديث الخطوة:", id)}
-              onViewDetails={() => {
-                console.log("عرض تفاصيل الخطة العلاجية");
-                onNavigate?.("treatment-plan-detail");
-              }}
-            />
-          ) : (
-            <PatientList
-              clinicName="جميع العيادات"
-              onViewPatient={(id) => console.log("عرض المريض:", id)}
-            />
-          )}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            {userType === "patient" ? (
+              <TreatmentPlanCard
+                patientName={userName}
+                planTitle="خطة علاج التسوس والتنظيف"
+                steps={mockTreatmentSteps}
+                onUpdateStep={(id) => console.log("تحديث الخطوة:", id)}
+                onViewDetails={() => {
+                  console.log("عرض تفاصيل الخطة العلاجية");
+                  onNavigate?.("treatment-plan-detail");
+                }}
+              />
+            ) : (
+              <PatientList
+                clinicName="جميع العيادات"
+                onViewPatient={(id) => console.log("عرض المريض:", id)}
+              />
+            )}
+          </div>
         </div>
 
         <div className="space-y-6">
-          <UserProfileCard
-            name={userName}
-            userType={userType as any}
-            email={`${userName.split(" ")[0].toLowerCase()}@hospital.com`}
-            phone="0100-123-4567"
-            joinDate="2025-10-01"
-          />
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <UserProfileCard
+              name={userName}
+              userType={userType as any}
+              email={`${userName.split(" ")[0].toLowerCase()}@hospital.com`}
+              phone="0100-123-4567"
+              joinDate="2025-10-01"
+            />
+          </div>
 
           {userType !== "patient" && (
-            <ReportsList
-              onViewReport={(id) => console.log("عرض التقرير:", id)}
-              onAddReport={() => console.log("إضافة تقرير")}
-            />
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <ReportsList
+                onViewReport={(id) => console.log("عرض التقرير:", id)}
+                onAddReport={() => console.log("إضافة تقرير")}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -769,7 +811,7 @@ function Dashboard() {
               <ThemeToggle />
             </div>
           </header>
-          <main className={`flex-1 overflow-auto p-6 ${isLoading ? 'opacity-50 pointer-events-none' : 'page-transition'}`}>
+          <main className={`flex-1 overflow-auto p-6 bg-slate-50 dark:bg-slate-900 ${isLoading ? 'opacity-50 pointer-events-none' : 'page-transition'}`}>
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
