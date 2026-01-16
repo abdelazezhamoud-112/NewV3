@@ -81,7 +81,7 @@ export default function TreatmentPlanCard({
                     {getStatusIcon(step.status)}
                   </div>
                   
-                  <Card className="flex-1 hover-elevate bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800">
+                  <Card className="flex-1 hover-elevate bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800">
                     <CardContent className="p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
                         <h4 className="font-semibold text-lg">{step.title}</h4>

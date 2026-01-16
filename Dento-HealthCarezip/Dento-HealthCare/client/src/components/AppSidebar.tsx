@@ -50,7 +50,7 @@ export default function AppSidebar({ activePage = "home", onNavigate, customPage
           </div>
           <div>
             <h2 className="font-bold text-lg">Dento Health Care</h2>
-            <p className="text-xs text-muted-foreground">جامعة الدلتا للعلوم والتكنولوجيا</p>
+            <p className="text-xs text-[#ffffff]">جامعة الدلتا للعلوم والتكنولوجيا</p>
           </div>
         </div>
       </SidebarHeader>

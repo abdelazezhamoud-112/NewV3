@@ -135,10 +135,10 @@ function HomePage({ userName, userType, onNavigate, language = "ar" }: { userNam
   const lang = t[language];
   
   const statsCards = [
-    { title: lang.todayAppointments, value: "3", icon: "📅", color: "border-l-blue-500 bg-blue-50 dark:bg-blue-950/30" },
-    { title: lang.activeTreatments, value: "2", icon: "🦷", color: "border-l-green-500 bg-green-50 dark:bg-green-950/30" },
-    { title: lang.totalClinics, value: "12", icon: "🏥", color: "border-l-purple-500 bg-purple-50 dark:bg-purple-950/30" },
-    { title: lang.pendingPayments, value: "850 ج.م", icon: "💳", color: "border-l-orange-500 bg-orange-50 dark:bg-orange-950/30" },
+    { title: lang.todayAppointments, value: "3", icon: "📅", color: "border-l-teal-500 bg-teal-50 dark:bg-teal-950/30" },
+    { title: lang.activeTreatments, value: "2", icon: "🦷", color: "border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/30" },
+    { title: lang.totalClinics, value: "12", icon: "🏥", color: "border-l-cyan-500 bg-cyan-50 dark:bg-cyan-950/30" },
+    { title: lang.pendingPayments, value: "850 ج.م", icon: "💳", color: "border-l-amber-500 bg-amber-50 dark:bg-amber-950/30" },
   ];
   
   const mockTreatmentSteps = [
