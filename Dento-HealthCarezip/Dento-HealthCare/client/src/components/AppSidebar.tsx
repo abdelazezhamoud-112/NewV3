@@ -42,7 +42,7 @@ export default function AppSidebar({ activePage = "home", onNavigate, customPage
   };
 
   return (
-    <Sidebar>
+    <Sidebar side="right">
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary rounded-lg">
