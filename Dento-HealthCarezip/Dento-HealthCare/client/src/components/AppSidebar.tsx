@@ -1,4 +1,4 @@
-import { Home, Hospital, Calendar, Settings, ChevronDown, SquareCode, Clock, Users, FileTextIcon, Star, Search, CreditCard, Wand2, Brain } from "lucide-react";
+import { Home, Hospital, Calendar, ChevronDown, SquareCode, Clock, Users, FileTextIcon, Star, Search, CreditCard, Wand2, Brain } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -206,17 +206,6 @@ export default function AppSidebar({ activePage = "home", onNavigate, customPage
                 >
                   <Wand2 className="w-4 h-4" />
                   <span>Dento الذكي</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => handleClick("settings")}
-                  isActive={activePage === "settings"}
-                  data-testid="nav-settings"
-                >
-                  <Settings className="w-4 h-4" />
-                  <span>الإعدادات</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
