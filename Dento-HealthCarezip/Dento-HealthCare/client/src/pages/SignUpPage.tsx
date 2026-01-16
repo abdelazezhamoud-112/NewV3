@@ -12,9 +12,10 @@ import loginBg from "@assets/stock_images/modern_dental_hospit_e3518571.jpg";
 
 interface SignUpPageProps {
   onSignUp?: (userData: any) => void;
+  onLoginClick?: () => void;
 }
 
-export default function SignUpPage({ onSignUp }: SignUpPageProps) {
+export default function SignUpPage({ onSignUp, onLoginClick }: SignUpPageProps) {
   const [step, setStep] = useState(1);
   const [userType, setUserType] = useState<string>("patient");
   const [formData, setFormData] = useState({
@@ -604,9 +605,14 @@ export default function SignUpPage({ onSignUp }: SignUpPageProps) {
               <div className="text-center pt-4 border-t">
                 <p className="text-sm text-muted-foreground">
                   {t.haveAccount}{" "}
-                  <Link href="/" className="text-primary hover:underline font-medium" data-testid="link-login">
+                  <button 
+                    type="button"
+                    onClick={onLoginClick}
+                    className="text-primary hover:underline font-medium" 
+                    data-testid="link-login"
+                  >
                     {t.login}
-                  </Link>
+                  </button>
                 </p>
               </div>
             </form>

@@ -674,10 +674,13 @@ function Dashboard() {
 
   if (!isLoggedIn) {
     if (showSignUp) {
-      return <SignUpPage onSignUp={(userData) => {
-        handleLogin(userData.userType, userData.fullName);
-        setShowSignUp(false);
-      }} />;
+      return <SignUpPage 
+        onSignUp={(userData) => {
+          handleLogin(userData.userType, userData.fullName);
+          setShowSignUp(false);
+        }}
+        onLoginClick={() => setShowSignUp(false)}
+      />;
     }
     return <LoginPage onLogin={handleLogin} onSignUpClick={() => setShowSignUp(true)} />;
   }
