@@ -170,11 +170,17 @@ export default function SignUpPage({ onSignUp, onLoginClick }: SignUpPageProps) 
 
   const handleNext = () => {
     if (step === 2 && !validateStep2()) return;
-    if (step < 3) setStep(step + 1);
+    if (step < 3) {
+      setErrors({});
+      setStep(step + 1);
+    }
   };
 
   const handleBack = () => {
-    if (step > 1) setStep(step - 1);
+    if (step > 1) {
+      setErrors({});
+      setStep(step - 1);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
