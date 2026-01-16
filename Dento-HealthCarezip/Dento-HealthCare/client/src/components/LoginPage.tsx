@@ -28,7 +28,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
   const [usernameValid, setUsernameValid] = useState(false);
   const [passwordValid, setPasswordValid] = useState(false);
   const [showShake, setShowShake] = useState(false);
-  const [enable2FA, setEnable2FA] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -106,21 +105,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
     setTimeout(() => setShowShake(false), 500);
   };
 
-  // Load demo account
-  const loadDemoAccount = (type: string) => {
-    const demos: { [key: string]: { username: string; password: string } } = {
-      patient: { username: "patient123", password: "Patient@123" },
-      doctor: { username: "doctor456", password: "Doctor@456" },
-      student: { username: "student789", password: "Student@789" },
-      graduate: { username: "intern2024", password: "Intern@2024" },
-    };
-    const demo = demos[type];
-    if (demo) {
-      setUsername(demo.username);
-      setPassword(demo.password);
-      setUserType(type);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,12 +140,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
       return;
     }
     
-    if (rememberMe) {
-      localStorage.setItem("dentoRememberedUser", username);
-    } else {
-      localStorage.removeItem("dentoRememberedUser");
-    }
-
     setIsLoading(true);
     setErrors({});
     
@@ -190,6 +168,20 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
       }
 
       localStorage.setItem('dentoUser', JSON.stringify(data));
+      
+      // Save session for "Remember Me" - 30 days expiry
+      if (rememberMe) {
+        const session = {
+          username: data.username,
+          userType: data.userType || userType,
+          expiry: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+        };
+        localStorage.setItem("dentoUserSession", JSON.stringify(session));
+        localStorage.setItem("dentoRememberedUser", username);
+      } else {
+        localStorage.removeItem("dentoUserSession");
+        localStorage.removeItem("dentoRememberedUser");
+      }
       
       if (onLogin) {
         onLogin(data.userType || userType, data.username);
@@ -235,8 +227,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
       login: "تسجيل الدخول",
       forgotPassword: "نسيت كلمة المرور؟",
       rememberMe: "تذكرني",
-      demoAccounts: "حسابات تجريبية",
-      enable2FA: "تفعيل المصادقة الثنائية",
       signUp: "إنشاء حساب جديد",
       socialLogin: "أو سجل الدخول عبر",
       clearForm: "مسح",
@@ -256,8 +246,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
       login: "Sign In",
       forgotPassword: "Forgot Password?",
       rememberMe: "Remember me",
-      demoAccounts: "Demo Accounts",
-      enable2FA: "Enable Two-Factor Auth",
       signUp: "Create New Account",
       socialLogin: "Or sign in with",
       clearForm: "Clear",
@@ -691,7 +679,7 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.6 }}
-                className="flex items-center justify-between"
+                className="flex items-center"
               >
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -704,45 +692,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
                   <Label htmlFor="remember" className="text-sm cursor-pointer font-medium">
                     {t.rememberMe}
                   </Label>
-                </div>
-
-                {/* 2FA Toggle */}
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="2fa"
-                    checked={enable2FA}
-                    onCheckedChange={(checked) => setEnable2FA(checked as boolean)}
-                    disabled={isLoading}
-                    data-testid="checkbox-2fa"
-                  />
-                  <Label htmlFor="2fa" className="text-xs cursor-pointer font-medium text-muted-foreground hover:text-primary">
-                    {t.enable2FA}
-                  </Label>
-                </div>
-              </motion.div>
-
-              {/* Demo Accounts */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.65 }}
-                className="space-y-2"
-              >
-                <p className="text-xs font-semibold text-muted-foreground">{t.demoAccounts}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {userTypes.map(({ value, label }) => (
-                    <Button
-                      key={value}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadDemoAccount(value)}
-                      className="text-xs"
-                      disabled={isLoading}
-                    >
-                      {label}
-                    </Button>
-                  ))}
                 </div>
               </motion.div>
 
@@ -805,7 +754,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
                     setPassword("");
                     setErrors({});
                     setRememberMe(false);
-                    setEnable2FA(false);
                   }}
                   disabled={isLoading}
                   data-testid="button-clear-form"
