@@ -739,29 +739,6 @@ export default function LoginPage({ onLogin, onSignUpClick }: LoginPageProps) {
                 </motion.div>
               </motion.div>
 
-              {/* Clear Form Button */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.75 }}
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setUsername("");
-                    setPassword("");
-                    setErrors({});
-                    setRememberMe(false);
-                  }}
-                  disabled={isLoading}
-                  data-testid="button-clear-form"
-                >
-                  {t.clearForm}
-                </Button>
-              </motion.div>
-
               {/* Sign Up Link */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
